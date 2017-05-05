@@ -11,9 +11,7 @@ Maintainer  : emertens@gmail.com
 module Config.Schema.Docs where
 
 import           Control.Applicative
-import           Control.Applicative.Free         (runAp_)
 import qualified Data.Text as Text
-import           Data.Functor.Const
 import           Data.Functor.Compose
 import           Data.List
 

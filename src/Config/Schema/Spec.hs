@@ -14,10 +14,8 @@ import Config
 import Control.Applicative              (Alternative(..))
 import Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
 import Control.Alternative.Free         (Alt, liftAlt, runAlt)
-import Data.Monoid                      ((<>))
 import Data.Text                        (Text)
 import Data.Functor.Coyoneda
-import qualified Data.Text as Text
 
 ------------------------------------------------------------------------
 -- Specifications for sections
@@ -97,7 +95,7 @@ newtype ValuesSpec a = MkValuesSpec (Alt (Coyoneda ValueSpec) a)
   deriving (Functor, Applicative, Alternative)
 
 
-runValuesSpec :: Alternative f => (forall x. ValueSpec x -> f x) -> ValuesSpec x -> f x
+runValuesSpec :: Alternative f => (forall x. ValueSpec x -> f x) -> ValuesSpec a -> f a
 runValuesSpec f (MkValuesSpec s) = runAlt (\(Coyoneda g x) -> fmap g (f x))  s
 
 

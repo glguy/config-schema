@@ -9,11 +9,10 @@ Maintainer  : emertens@gmail.com
 -}
 module Config.Schema.Load where
 
-import Control.Applicative              ((<|>), optional)
+import Control.Applicative              (optional)
 import Control.Monad.Trans.State        (StateT(..), runStateT)
 import Control.Monad                    (guard)
 import Control.Monad.Trans.Class        (lift)
-import Control.Applicative.Free         (runAp)
 import Data.Text                        (Text)
 
 import Config.Schema.Spec
