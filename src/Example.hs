@@ -44,6 +44,7 @@ yesOrNo = True  <$ atomSpec "yes" <|>
           False <$ atomSpec "no"
 
 
+printDoc :: IO ()
 printDoc = putStr $ unlines $ sectionsDoc exampleSpec
 -- *Example> printDoc
 -- name :: text; Full name
@@ -51,6 +52,7 @@ printDoc = putStr $ unlines $ sectionsDoc exampleSpec
 -- happy :: optional `yes` or `no`; Current happiness status
 -- kids :: text or list of text; All children
 
+exampleVal :: Maybe Text
 exampleVal = getSections exampleSpec exampleSections
 -- *Example> exampleVal
 -- Just "Johny Appleseed is 99 years old and has kids Bob, Tom and is happy"

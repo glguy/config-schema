@@ -10,13 +10,13 @@ Maintainer  : emertens@gmail.com
 module Config.Schema.Load where
 
 import Control.Applicative              (optional)
-import Control.Monad.Trans.State        (StateT(..), runStateT)
 import Control.Monad                    (guard)
 import Control.Monad.Trans.Class        (lift)
+import Control.Monad.Trans.State        (StateT(..), runStateT)
 import Data.Text                        (Text)
 
-import Config.Schema.Spec
 import Config
+import Config.Schema.Spec
 
 getSection :: SectionSpec a -> StateT [Section] Maybe a
 getSection (ReqSection k _ w) =
@@ -33,6 +33,20 @@ getSections p xs =
      return a
 
 
+getValues :: ValuesSpec a -> Value -> Maybe a
+getValues s v = runValuesSpec (`getValue` v) s
+
+
+getValue :: ValueSpec a -> Value -> Maybe a
+getValue TextSpec         (Text t)     = Just t
+getValue NumberSpec       (Number _ n) = Just n
+getValue (ListSpec w)     (List xs)    = traverse (getValues w) xs
+getValue (AtomSpec a)     (Atom b)     = guard (a == b)
+getValue (SectionsSpec w) (Sections s) = getSections w s
+getValue _                _            = Nothing
+
+
+
 -- | Extract a section from a list of sections by name.
 lookupSection ::
   Text                     {- ^ section name                       -} ->
@@ -44,13 +58,3 @@ lookupSection key (s@(Section k v):xs)
   | otherwise = do (v',xs') <- lookupSection key xs
                    return (v',s:xs')
 
-getValues :: ValuesSpec a -> Value -> Maybe a
-getValues s v = runValuesSpec (`getValue` v) s
-
-getValue :: ValueSpec a -> Value -> Maybe a
-getValue TextSpec         (Text t)     = Just t
-getValue NumberSpec       (Number _ n) = Just n
-getValue (ListSpec w)     (List xs)    = traverse (getValues w) xs
-getValue (AtomSpec a)     (Atom b)     = guard (a == b)
-getValue (SectionsSpec w) (Sections s) = getSections w s
-getValue _                _            = Nothing

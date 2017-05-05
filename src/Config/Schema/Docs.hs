@@ -10,10 +10,10 @@ Maintainer  : emertens@gmail.com
 -}
 module Config.Schema.Docs where
 
-import           Control.Applicative
+import           Control.Applicative (Alternative, Const(..))
+import           Data.Functor.Compose (Compose(..))
+import           Data.List (intercalate)
 import qualified Data.Text as Text
-import           Data.Functor.Compose
-import           Data.List
 
 import           Config
 import           Config.Schema.Spec

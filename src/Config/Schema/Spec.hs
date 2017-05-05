@@ -10,12 +10,13 @@ Maintainer  : emertens@gmail.com
 -}
 module Config.Schema.Spec where
 
-import Config
+import Control.Alternative.Free         (Alt, liftAlt, runAlt)
 import Control.Applicative              (Alternative(..))
 import Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
-import Control.Alternative.Free         (Alt, liftAlt, runAlt)
-import Data.Text                        (Text)
 import Data.Functor.Coyoneda
+import Data.Text                        (Text)
+
+import Config
 
 ------------------------------------------------------------------------
 -- Specifications for sections
@@ -84,10 +85,10 @@ optSection' n i w = sectionSpec (OptSection n i w)
 ------------------------------------------------------------------------
 
 data ValueSpec :: * -> * where
-  ListSpec     :: ValuesSpec a -> ValueSpec [a]
-  TextSpec     :: ValueSpec Text
-  NumberSpec   :: ValueSpec Integer
-  AtomSpec     :: Atom -> ValueSpec ()
+  TextSpec     ::                   ValueSpec Text
+  NumberSpec   ::                   ValueSpec Integer
+  AtomSpec     :: Atom           -> ValueSpec ()
+  ListSpec     :: ValuesSpec   a -> ValueSpec [a]
   SectionsSpec :: SectionsSpec a -> ValueSpec a
 
 
@@ -96,7 +97,7 @@ newtype ValuesSpec a = MkValuesSpec (Alt (Coyoneda ValueSpec) a)
 
 
 runValuesSpec :: Alternative f => (forall x. ValueSpec x -> f x) -> ValuesSpec a -> f a
-runValuesSpec f (MkValuesSpec s) = runAlt (\(Coyoneda g x) -> fmap g (f x))  s
+runValuesSpec f (MkValuesSpec s) = runAlt (lowerCoyoneda . hoistCoyoneda f) s
 
 
 valueSpec :: ValueSpec a -> ValuesSpec a
@@ -130,3 +131,11 @@ sectionsSpec = valueSpec . SectionsSpec
 
 oneOrList :: ValuesSpec a -> ValuesSpec [a]
 oneOrList s = (:[]) <$> s <|> listSpec s
+
+
+------------------------------------------------------------------------
+
+-- | Given a natural transformation from @f@ to @g@ this gives a
+-- natural transformatin from @Coyoneda f@ to @Coyoneda g@.
+hoistCoyoneda :: (forall x. f x -> g x) -> Coyoneda f a -> Coyoneda g a
+hoistCoyoneda f (Coyoneda g x) = Coyoneda g (f x)
