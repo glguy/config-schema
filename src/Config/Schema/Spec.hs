@@ -128,3 +128,7 @@ listSpec = valueSpec . ListSpec
 
 sectionsSpec :: SectionsSpec a -> ValuesSpec a
 sectionsSpec = valueSpec . SectionsSpec
+
+
+oneOrList :: ValuesSpec a -> ValuesSpec [a]
+oneOrList s = (:[]) <$> s <|> listSpec s

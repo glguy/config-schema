@@ -1,4 +1,4 @@
-{-# Language GADTs #-}
+{-# Language GADTs, GeneralizedNewtypeDeriving #-}
 
 {-|
 Module      : Config.Schema.Docs
@@ -14,6 +14,7 @@ import           Control.Applicative
 import           Control.Applicative.Free         (runAp_)
 import qualified Data.Text as Text
 import           Data.Functor.Const
+import           Data.Functor.Compose
 import           Data.List
 
 import           Config
@@ -39,15 +40,25 @@ sectionDoc (OptSection name desc w) =
 data DocLines = ShortDoc String | LongDoc [String]
 
 valuesDoc :: ValuesSpec a -> DocLines
-valuesDoc = flattenOptions . getChoices . runValuesSpec (Choices . pure . pure . valueDoc)
+valuesDoc = flattenOptions . lowerChoices . runValuesSpec (liftChoices . inflateOptions . valueDoc)
+
+inflateOptions :: DocLines -> [[DocLines]]
+inflateOptions x = [[x]]
 
 flattenOptions :: [[DocLines]] -> DocLines
 flattenOptions [[LongDoc x]] = LongDoc x
 flattenOptions xs
   = ShortDoc
   . intercalate " or "
-  . map (intercalate " and " . map simpleDocString)
+  . map (conjunction . map simpleDocString)
   $ xs
+
+
+-- | Explain a conjunction of docstrings
+conjunction :: [String] -> String
+conjunction [] = "ignored"
+conjunction xs = intercalate " and " xs
+
 
 simpleDocString :: DocLines -> String
 simpleDocString (ShortDoc x) = x
@@ -56,29 +67,25 @@ simpleDocString (LongDoc _) = "complex"
 valueDoc :: ValueSpec a -> DocLines
 valueDoc w =
   case w of
-    ListSpec ws ->
+    TextSpec       -> ShortDoc "text"
+    NumberSpec     -> ShortDoc "number"
+    AtomSpec a     -> ShortDoc ("`" ++ Text.unpack (atomName a) ++ "`")
+    SectionsSpec s -> LongDoc (sectionsDoc s)
+    ListSpec ws    ->
       case valuesDoc ws of
         ShortDoc x -> ShortDoc ("list of " ++ x)
         LongDoc xs -> LongDoc ("list of" : map ("    "++) xs)
-    TextSpec   -> ShortDoc "text"
-    NumberSpec -> ShortDoc "number"
-    AtomSpec a -> ShortDoc ("`" ++ Text.unpack (atomName a) ++ "`")
-    SectionsSpec s -> LongDoc (sectionsDoc s)
 
 
 ------------------------------------------------------------------------
 -- Gathered choices
 ------------------------------------------------------------------------
 
-newtype Choices f a x = Choices { getChoices :: f a }
+newtype Choices f m a = Choices { unChoices :: Compose f (Const m) a }
+  deriving (Functor, Applicative, Alternative)
 
-instance Functor (Choices f a) where
-  fmap _ (Choices x) = Choices x
+liftChoices :: Functor f => f m -> Choices f m a
+liftChoices = Choices . Compose . fmap Const
 
-instance (Applicative f, Monoid m) => Applicative (Choices f m) where
-  pure _                  = Choices (pure mempty)
-  Choices x <*> Choices y = Choices (liftA2 mappend x y)
-
-instance (Alternative f, Monoid m) => Alternative (Choices f m) where
-  empty                   = Choices empty
-  Choices x <|> Choices y = Choices (x <|> y)
+lowerChoices :: Functor f => Choices f m a -> f m
+lowerChoices = fmap getConst . getCompose . unChoices

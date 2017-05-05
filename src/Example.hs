@@ -15,41 +15,42 @@ exampleFile =
   \ age : 99\n\
   \ happy: yes\n\
   \ kids:\n\
-  \   * name: \"Bob\"\n\
-  \   * name: \"Tom\"\n"
+  \   * \"Bob\"\n\
+  \   * \"Tom\"\n"
 
-example :: [Section]
-Right (Sections example) = parse exampleFile
-
--- *Demo Config> fromConfig example exampleSpec
--- Just "Johny Appleseed is 99 years old and has kids: Bob, Tom and is happy"
---
--- *Demo Config> putStr $ unlines $ configDocLines exampleSpec
--- name :: text; Full name
--- age :: number; Age of user
--- happy :: `yes` or `no`; Current happiness status
--- kids :: section; All children
---     list of
---         name :: text; Name of the kid
+exampleSections :: [Section]
+Right (Sections exampleSections) = parse exampleFile
 
 exampleSpec :: SectionsSpec Text
 exampleSpec =
-  do name  <- reqSection "name" "Full name"
-     age   <- reqSection "age"  "Age of user"
-     happy <- reqSection' "happy" "Current happiness status" yesOrNo
-     kids  <- reqSection' "kids" "All children" (listSpec (sectionsSpec kidSpec))
+  do name  <- reqSection  "name" "Full name"
+     age   <- reqSection  "age"  "Age of user"
+     happy <- optSection' "happy" "Current happiness status" yesOrNo
+     kids  <- reqSection' "kids"  "All children" (oneOrList valuesSpec)
 
-     return (name <> " is " <> Text.pack (show (age::Integer)) <>
-             " years old and has kids: " <>
+     return $
+       let happyText = case happy of Just True  -> " and is happy"
+                                     Just False -> " and is not happy"
+                                     Nothing    -> " and is private"
+
+       in name <> " is " <> Text.pack (show (age::Integer)) <>
+             " years old and has kids " <>
              Text.intercalate ", " kids <>
-             if happy then " and is happy" else " and is not happy")
-
-
-kidSpec :: SectionsSpec Text
-kidSpec = reqSection "name" "Name of the kid"
+             happyText
 
 -- | Matches the 'yes' and 'no' atoms
 yesOrNo :: ValuesSpec Bool
 yesOrNo = True  <$ atomSpec "yes" <|>
           False <$ atomSpec "no"
 
+
+printDoc = putStr $ unlines $ sectionsDoc exampleSpec
+-- *Example> printDoc
+-- name :: text; Full name
+-- age :: number; Age of user
+-- happy :: optional `yes` or `no`; Current happiness status
+-- kids :: text or list of text; All children
+
+exampleVal = getSections exampleSpec exampleSections
+-- *Example> exampleVal
+-- Just "Johny Appleseed is 99 years old and has kids Bob, Tom and is happy"
