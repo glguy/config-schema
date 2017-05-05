@@ -1,6 +1,7 @@
 {-# Language OverloadedStrings, ApplicativeDo #-}
 module Example where
 
+import           Control.Applicative
 import qualified Data.Text as Text
 import           Data.Text (Text)
 import           Data.Monoid ((<>))
@@ -33,10 +34,10 @@ Right (Sections example) = parse exampleFile
 
 exampleSpec :: SectionsSpec Text
 exampleSpec =
-  do name  <- section "name" "Full name"
-     age   <- section "age"  "Age of user"
-     happy <- section' "happy" "Current happiness status" yesOrNo
-     kids  <- section' "kids" "All children" (ListSpec (SectionsSpec kidSpec))
+  do name  <- reqSection "name" "Full name"
+     age   <- reqSection "age"  "Age of user"
+     happy <- reqSection' "happy" "Current happiness status" yesOrNo
+     kids  <- reqSection' "kids" "All children" (listSpec (sectionsSpec kidSpec))
 
      return (name <> " is " <> Text.pack (show (age::Integer)) <>
              " years old and has kids: " <>
@@ -45,10 +46,10 @@ exampleSpec =
 
 
 kidSpec :: SectionsSpec Text
-kidSpec = section "name" "Name of the kid"
+kidSpec = reqSection "name" "Name of the kid"
 
 -- | Matches the 'yes' and 'no' atoms
-yesOrNo :: ValueSpec Bool
-yesOrNo = MapSpec (== Left()) $
-          ChoiceSpec (AtomSpec (MkAtom "yes")) (AtomSpec (MkAtom "no"))
+yesOrNo :: ValuesSpec Bool
+yesOrNo = True  <$ atomSpec "yes" <|>
+          False <$ atomSpec "no"
 

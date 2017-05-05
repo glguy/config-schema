@@ -22,10 +22,10 @@ import Config
 getSection :: SectionSpec a -> StateT [Section] Maybe a
 getSection (ReqSection k _ w) =
   do v <- StateT (lookupSection k)
-     lift (getValue w v)
+     lift (getValues w v)
 getSection (OptSection k _ w) =
   do mb <- optional (StateT (lookupSection k))
-     lift (traverse (getValue w) mb)
+     lift (traverse (getValues w) mb)
 
 
 getSections :: SectionsSpec a -> [Section] -> Maybe a
@@ -45,14 +45,13 @@ lookupSection key (s@(Section k v):xs)
   | otherwise = do (v',xs') <- lookupSection key xs
                    return (v',s:xs')
 
+getValues :: ValuesSpec a -> Value -> Maybe a
+getValues s v = runValuesSpec (`getValue` v) s
 
 getValue :: ValueSpec a -> Value -> Maybe a
 getValue TextSpec         (Text t)     = Just t
 getValue NumberSpec       (Number _ n) = Just n
-getValue (ListSpec w)     (List xs)    = traverse (getValue w) xs
+getValue (ListSpec w)     (List xs)    = traverse (getValues w) xs
 getValue (AtomSpec a)     (Atom b)     = guard (a == b)
-getValue (ChoiceSpec a b) v            = Left <$> getValue a v <|> Right <$> getValue b v
 getValue (SectionsSpec w) (Sections s) = getSections w s
-getValue (MapSpec f w)    v            = fmap f (getValue w v)
 getValue _                _            = Nothing
-

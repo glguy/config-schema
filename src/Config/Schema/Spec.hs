@@ -11,22 +11,29 @@ Maintainer  : emertens@gmail.com
 module Config.Schema.Spec where
 
 import Config
-import Control.Applicative              (optional, (<|>))
+import Control.Applicative              (Alternative(..))
 import Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
+import Control.Alternative.Free         (Alt, liftAlt, runAlt)
 import Data.Monoid                      ((<>))
 import Data.Text                        (Text)
+import Data.Functor.Coyoneda
 import qualified Data.Text as Text
 
 ------------------------------------------------------------------------
--- Configuration format description
+-- Specifications for sections
 ------------------------------------------------------------------------
+
+data SectionSpec :: * -> * where
+  ReqSection :: Text -> Text -> ValuesSpec a -> SectionSpec a
+  OptSection :: Text -> Text -> ValuesSpec a -> SectionSpec (Maybe a)
+
 
 newtype SectionsSpec a = MkSectionsSpec (Ap SectionSpec a)
   deriving (Functor, Applicative)
 
 
-sectionsSpec :: SectionSpec a -> SectionsSpec a
-sectionsSpec = MkSectionsSpec . liftAp
+sectionSpec :: SectionSpec a -> SectionsSpec a
+sectionSpec = MkSectionsSpec . liftAp
 
 
 runSections :: Applicative f => (forall x. SectionSpec x -> f x) -> SectionsSpec a -> f a
@@ -37,51 +44,87 @@ runSections_ :: Monoid m => (forall x. SectionSpec x -> m) -> SectionsSpec a -> 
 runSections_ f (MkSectionsSpec s) = runAp_ f s
 
 
-data SectionSpec :: * -> * where
-  ReqSection :: Text -> Text -> ValueSpec a -> SectionSpec a
-  OptSection :: Text -> Text -> ValueSpec a -> SectionSpec (Maybe a)
-
-data ValueSpec :: * -> * where
-  ListSpec     :: ValueSpec a -> ValueSpec [a]
-  TextSpec     :: ValueSpec Text
-  NumberSpec   :: ValueSpec Integer
-  AtomSpec     :: Atom -> ValueSpec ()
-  ChoiceSpec   :: ValueSpec a -> ValueSpec b -> ValueSpec (Either a b)
-  SectionsSpec :: SectionsSpec a -> ValueSpec a
-  MapSpec      :: (a -> b) -> ValueSpec a -> ValueSpec b
+------------------------------------------------------------------------
+-- 'SectionsSpec' builders
+------------------------------------------------------------------------
 
 
--- | Class for things that are easy to want
-class    Spec a       where valueSpec :: ValueSpec a
-instance Spec Text    where valueSpec = TextSpec
-instance Spec Integer where valueSpec = NumberSpec
-instance Spec a => Spec [a] where valueSpec = ListSpec valueSpec
-instance (Spec a, Spec b) => Spec (Either a b) where valueSpec = ChoiceSpec valueSpec valueSpec
-
-
-section ::
+reqSection ::
   Spec a =>
   Text {- ^ section name -} ->
   Text {- ^ description  -} ->
   SectionsSpec a
-section n i = sectionsSpec (ReqSection n i valueSpec)
+reqSection n i = sectionSpec (ReqSection n i valuesSpec)
 
 
-section' ::
-  Text        {- ^ section name  -} ->
-  Text        {- ^ description   -} ->
-  ValueSpec a {- ^ value matcher -} ->
+reqSection' ::
+  Text         {- ^ section name  -} ->
+  Text         {- ^ description   -} ->
+  ValuesSpec a {- ^ value matcher -} ->
   SectionsSpec a
-section' n i w = sectionsSpec (ReqSection n i w)
+reqSection' n i w = sectionSpec (ReqSection n i w)
+
+
+optSection ::
+  Spec a =>
+  Text {- ^ section name -} ->
+  Text {- ^ description  -} ->
+  SectionsSpec (Maybe a)
+optSection n i = sectionSpec (OptSection n i valuesSpec)
+
+
+optSection' ::
+  Text         {- ^ section name  -} ->
+  Text         {- ^ description   -} ->
+  ValuesSpec a {- ^ value matcher -} ->
+  SectionsSpec (Maybe a)
+optSection' n i w = sectionSpec (OptSection n i w)
 
 
 ------------------------------------------------------------------------
--- Configuration value parsing
+-- Specifications for values
+------------------------------------------------------------------------
+
+data ValueSpec :: * -> * where
+  ListSpec     :: ValuesSpec a -> ValueSpec [a]
+  TextSpec     :: ValueSpec Text
+  NumberSpec   :: ValueSpec Integer
+  AtomSpec     :: Atom -> ValueSpec ()
+  SectionsSpec :: SectionsSpec a -> ValueSpec a
+
+
+newtype ValuesSpec a = MkValuesSpec (Alt (Coyoneda ValueSpec) a)
+  deriving (Functor, Applicative, Alternative)
+
+
+runValuesSpec :: Alternative f => (forall x. ValueSpec x -> f x) -> ValuesSpec x -> f x
+runValuesSpec f (MkValuesSpec s) = runAlt (\(Coyoneda g x) -> fmap g (f x))  s
+
+
+valueSpec :: ValueSpec a -> ValuesSpec a
+valueSpec = MkValuesSpec . liftAlt . liftCoyoneda
+
+
+------------------------------------------------------------------------
+-- 'ValuesSpec' builders
 ------------------------------------------------------------------------
 
 
-------------------------------------------------------------------------
--- Documentation generation
-------------------------------------------------------------------------
+-- | Class for things that are easy to want
+class    Spec a       where valuesSpec :: ValuesSpec a
+instance Spec Text    where valuesSpec = valueSpec TextSpec
+instance Spec Integer where valuesSpec = valueSpec NumberSpec
+instance Spec a => Spec [a] where valuesSpec = valueSpec (ListSpec valuesSpec)
+instance (Spec a, Spec b) => Spec (Either a b) where valuesSpec = valuesSpec <|> valuesSpec
 
 
+atomSpec :: Text -> ValuesSpec ()
+atomSpec = valueSpec . AtomSpec . MkAtom
+
+
+listSpec :: ValuesSpec a -> ValuesSpec [a]
+listSpec = valueSpec . ListSpec
+
+
+sectionsSpec :: SectionsSpec a -> ValuesSpec a
+sectionsSpec = valueSpec . SectionsSpec
