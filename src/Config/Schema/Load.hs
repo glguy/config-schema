@@ -7,7 +7,13 @@ License     : ISC
 Maintainer  : emertens@gmail.com
 
 -}
-module Config.Schema.Load where
+module Config.Schema.Load
+  ( loadValue
+
+  -- * Errors
+  , LoadError(..)
+  , Problem(..)
+  ) where
 
 import           Control.Applicative              (Alternative, optional)
 import           Control.Monad                    (MonadPlus, unless, zipWithM)
@@ -24,45 +30,46 @@ import           Config
 import           Config.Schema.Spec
 
 
-loadSections :: SectionsSpec a -> Value -> Either [LoadError] a
-loadSections spec val = runLoad (getValue (SectionsSpec spec) val)
+loadValue :: ValueSpecs a -> Value -> Either [LoadError] a
+loadValue spec val = runLoad (getValue spec val)
 
 
 getSection :: SectionSpec a -> StateT [Section] Load a
 getSection (ReqSection k _ w) =
   do v <- StateT (lookupSection k)
-     lift (scope k (getValues w v))
+     lift (scope k (getValue w v))
 getSection (OptSection k _ w) =
   do mb <- optional (StateT (lookupSection k))
-     lift (traverse (scope k . getValues w) mb)
+     lift (traverse (scope k . getValue w) mb)
 
 
-getSections :: SectionsSpec a -> [Section] -> Load a
+getSections :: SectionSpecs a -> [Section] -> Load a
 getSections p xs =
   do (a,leftover) <- runStateT (runSections getSection p) xs
      unless (null leftover) (loadFail (UnusedSections (map sectionName leftover)))
      return a
 
 
-getValues :: ValuesSpec a -> Value -> Load a
-getValues s v = asum (runValuesSpec (`getValue` v) s)
+getValue :: ValueSpecs a -> Value -> Load a
+getValue s v = asum (runValueSpecs (getValue1 v) s)
 
 
-getValue :: ValueSpec a -> Value -> Load a
-getValue TextSpec         (Text t)       = pure t
-getValue IntegerSpec      (Number _ n)   = pure n
-getValue IntegerSpec      (Floating a b) = maybe (loadFail TypeMismatch) pure (floatingToInteger a b)
-getValue RationalSpec     (Number _ n)   = pure (fromInteger n)
-getValue RationalSpec     (Floating a b) = pure (floatingToRational a b)
-getValue (ListSpec w)     (List xs)      = scopedTraverse (getValues w) xs
-getValue AnyAtomSpec      (Atom b)       = pure (atomName b)
-getValue (AtomSpec a)     (Atom b)       = unless (a == atomName b) (loadFail (AtomMismatch a))
-getValue (SectionsSpec w) (Sections s)   = getSections w s
-getValue (CustomSpec lbl w f) v = do x <- getValues w v
-                                     case f x of
-                                       Nothing -> loadFail (CustomFail lbl)
-                                       Just y  -> pure y
-getValue _                _              = loadFail TypeMismatch
+getValue1 :: Value -> ValueSpec a -> Load a
+getValue1 (Text t)       TextSpec           = pure t
+getValue1 (Number _ n)   IntegerSpec        = pure n
+getValue1 (Floating a b) IntegerSpec        = maybe (loadFail TypeMismatch) pure (floatingToInteger a b)
+getValue1 (Number _ n)   RationalSpec       = pure (fromInteger n)
+getValue1 (Floating a b) RationalSpec       = pure (floatingToRational a b)
+getValue1 (List xs)      (ListSpec w)       = scopedTraverse (getValue w) xs
+getValue1 (Atom b)       AnyAtomSpec        = pure (atomName b)
+getValue1 (Atom b)       (AtomSpec a)       = unless (a == atomName b) (loadFail (AtomMismatch a))
+getValue1 (Sections s)   (SectionSpecs _ w) = getSections w s
+getValue1 v              (CustomSpec l w f) =
+  do x <- getValue w v
+     case f x of
+       Nothing -> loadFail (CustomFail l)
+       Just y  -> pure y
+getValue1 _                  _              = loadFail TypeMismatch
 
 
 scopedTraverse :: (a -> Load b) -> [a] -> Load [b]

@@ -21,28 +21,28 @@ import qualified Data.Text as Text
 ------------------------------------------------------------------------
 
 data SectionSpec :: * -> * where
-  ReqSection :: Text -> Text -> ValuesSpec a -> SectionSpec a
-  OptSection :: Text -> Text -> ValuesSpec a -> SectionSpec (Maybe a)
+  ReqSection :: Text -> Text -> ValueSpecs a -> SectionSpec a
+  OptSection :: Text -> Text -> ValueSpecs a -> SectionSpec (Maybe a)
 
 
-newtype SectionsSpec a = MkSectionsSpec (Ap SectionSpec a)
+newtype SectionSpecs a = MkSectionSpecs (Ap SectionSpec a)
   deriving (Functor, Applicative)
 
 
-sectionSpec :: SectionSpec a -> SectionsSpec a
-sectionSpec = MkSectionsSpec . liftAp
+sectionSpec :: SectionSpec a -> SectionSpecs a
+sectionSpec = MkSectionSpecs . liftAp
 
 
-runSections :: Applicative f => (forall x. SectionSpec x -> f x) -> SectionsSpec a -> f a
-runSections f (MkSectionsSpec s) = runAp f s
+runSections :: Applicative f => (forall x. SectionSpec x -> f x) -> SectionSpecs a -> f a
+runSections f (MkSectionSpecs s) = runAp f s
 
 
-runSections_ :: Monoid m => (forall x. SectionSpec x -> m) -> SectionsSpec a -> m
-runSections_ f (MkSectionsSpec s) = runAp_ f s
+runSections_ :: Monoid m => (forall x. SectionSpec x -> m) -> SectionSpecs a -> m
+runSections_ f (MkSectionSpecs s) = runAp_ f s
 
 
 ------------------------------------------------------------------------
--- 'SectionsSpec' builders
+-- 'SectionSpecs' builders
 ------------------------------------------------------------------------
 
 
@@ -50,15 +50,15 @@ reqSection ::
   Spec a =>
   Text {- ^ section name -} ->
   Text {- ^ description  -} ->
-  SectionsSpec a
+  SectionSpecs a
 reqSection n i = sectionSpec (ReqSection n i valuesSpec)
 
 
 reqSection' ::
   Text         {- ^ section name  -} ->
   Text         {- ^ description   -} ->
-  ValuesSpec a {- ^ value matcher -} ->
-  SectionsSpec a
+  ValueSpecs a {- ^ value matcher -} ->
+  SectionSpecs a
 reqSection' n i w = sectionSpec (ReqSection n i w)
 
 
@@ -66,15 +66,15 @@ optSection ::
   Spec a =>
   Text {- ^ section name -} ->
   Text {- ^ description  -} ->
-  SectionsSpec (Maybe a)
+  SectionSpecs (Maybe a)
 optSection n i = sectionSpec (OptSection n i valuesSpec)
 
 
 optSection' ::
   Text         {- ^ section name  -} ->
   Text         {- ^ description   -} ->
-  ValuesSpec a {- ^ value matcher -} ->
-  SectionsSpec (Maybe a)
+  ValueSpecs a {- ^ value matcher -} ->
+  SectionSpecs (Maybe a)
 optSection' n i w = sectionSpec (OptSection n i w)
 
 
@@ -83,38 +83,53 @@ optSection' n i w = sectionSpec (OptSection n i w)
 ------------------------------------------------------------------------
 
 data ValueSpec :: * -> * where
-  TextSpec     ::                   ValueSpec Text
-  IntegerSpec  ::                   ValueSpec Integer
-  RationalSpec ::                   ValueSpec Rational
-  AnyAtomSpec  ::                   ValueSpec Text
-  AtomSpec     :: Text           -> ValueSpec ()
-  ListSpec     :: ValuesSpec   a -> ValueSpec [a]
-  SectionsSpec :: SectionsSpec a -> ValueSpec a
-  CustomSpec   :: Text -> ValuesSpec a -> (a -> Maybe b) -> ValueSpec b
+  -- | Matches any string literal
+  TextSpec :: ValueSpec Text
+
+  -- | Matches integral numbers
+  IntegerSpec  :: ValueSpec Integer
+
+  -- | Matches any number
+  RationalSpec :: ValueSpec Rational
+
+  -- | Matches any atom
+  AnyAtomSpec  :: ValueSpec Text
+
+  -- | Specific atom to be matched
+  AtomSpec :: Text -> ValueSpec ()
+
+  -- | Matches a list of the underlying specification
+  ListSpec :: ValueSpecs a -> ValueSpec [a]
+
+  -- | Documentation identifier and section specification
+  SectionSpecs :: Text -> SectionSpecs a -> ValueSpec a
+
+  -- | Documentation text, underlying specification, and filtering function
+  CustomSpec :: Text -> ValueSpecs a -> (a -> Maybe b) -> ValueSpec b
 
 
-newtype ValuesSpec a = MkValuesSpec { unValueSpec :: Compose [] (Ap ValueSpec) a }
+newtype ValueSpecs a = MkValueSpecs { unValueSpec :: Compose [] (Ap ValueSpec) a }
   deriving (Functor, Applicative, Alternative)
 
 
-runValuesSpec :: Applicative f => (forall x. ValueSpec x -> f x) -> ValuesSpec a -> [f a]
-runValuesSpec f =  map (runAp f) . getCompose . unValueSpec
+runValueSpecs :: Applicative f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> [f a]
+runValueSpecs f =  map (runAp f) . getCompose . unValueSpec
 
-runValuesSpec_ :: Monoid m => (forall x. ValueSpec x -> m) -> ValuesSpec a -> [m]
-runValuesSpec_ f = map (runAp_ f) . getCompose . unValueSpec
+runValueSpecs_ :: Monoid m => (forall x. ValueSpec x -> m) -> ValueSpecs a -> [m]
+runValueSpecs_ f = map (runAp_ f) . getCompose . unValueSpec
 
 
-valueSpec :: ValueSpec a -> ValuesSpec a
-valueSpec = MkValuesSpec . Compose . pure . liftAp
+valueSpec :: ValueSpec a -> ValueSpecs a
+valueSpec = MkValueSpecs . Compose . pure . liftAp
 
 
 ------------------------------------------------------------------------
--- 'ValuesSpec' builders
+-- 'ValueSpecs' builders
 ------------------------------------------------------------------------
 
 
 -- | Class for things that are easy to want
-class    Spec a       where valuesSpec :: ValuesSpec a
+class    Spec a       where valuesSpec :: ValueSpecs a
 instance Spec Text    where valuesSpec = valueSpec TextSpec
 instance Spec Integer where valuesSpec = valueSpec IntegerSpec
 instance Spec Int     where valuesSpec = fromInteger <$> valuesSpec
@@ -123,29 +138,34 @@ instance Spec a => Spec [a] where valuesSpec = valueSpec (ListSpec valuesSpec)
 instance (Spec a, Spec b) => Spec (Either a b) where valuesSpec = valuesSpec <|> valuesSpec
 
 
-atomSpec :: Text -> ValuesSpec ()
+atomSpec :: Text -> ValueSpecs ()
 atomSpec = valueSpec . AtomSpec
 
-anyAtomSpec :: ValuesSpec Text
+anyAtomSpec :: ValueSpecs Text
 anyAtomSpec = valueSpec AnyAtomSpec
 
-stringSpec :: ValuesSpec String
+stringSpec :: ValueSpecs String
 stringSpec = Text.unpack <$> valuesSpec
 
-numSpec :: Num a => ValuesSpec a
+numSpec :: Num a => ValueSpecs a
 numSpec = fromInteger <$> valuesSpec
 
-listSpec :: ValuesSpec a -> ValuesSpec [a]
+listSpec :: ValueSpecs a -> ValueSpecs [a]
 listSpec = valueSpec . ListSpec
 
 
-sectionsSpec :: SectionsSpec a -> ValuesSpec a
-sectionsSpec = valueSpec . SectionsSpec
+-- | Named subsection value specification. The unique identifier will be used
+-- for generating a documentation section for this specification and will be.
+sectionsSpec ::
+  Text           {- ^ unique documentation identifier -} ->
+  SectionSpecs a {- ^ underlying specification        -} ->
+  ValueSpecs a
+sectionsSpec i s = valueSpec (SectionSpecs i s)
 
 
-oneOrList :: ValuesSpec a -> ValuesSpec [a]
+oneOrList :: ValueSpecs a -> ValueSpecs [a]
 oneOrList s = (:[]) <$> s <|> listSpec s
 
 
-customSpec :: Text -> ValuesSpec a -> (a -> Maybe b) -> ValuesSpec b
+customSpec :: Text -> ValueSpecs a -> (a -> Maybe b) -> ValueSpecs b
 customSpec lbl w f = valueSpec (CustomSpec lbl w f)

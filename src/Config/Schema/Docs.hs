@@ -1,4 +1,4 @@
-{-# Language GADTs, GeneralizedNewtypeDeriving #-}
+{-# Language OverloadedStrings, GADTs, GeneralizedNewtypeDeriving #-}
 
 {-|
 Module      : Config.Schema.Docs
@@ -8,68 +8,93 @@ License     : ISC
 Maintainer  : emertens@gmail.com
 
 -}
-module Config.Schema.Docs where
+module Config.Schema.Docs
+  ( generateDocs
+  , generateDocs'
+  , KeyValueDoc(..)
+  ) where
 
-import           Data.List (intercalate)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Monoid
+import           Data.Text (Text)
 import qualified Data.Text as Text
 
 import           Config.Schema.Spec
 
-sectionsDoc :: SectionsSpec a -> [String]
-sectionsDoc = runSections_ sectionDoc
+-- | Default documentation generator. This generator is specifically
+-- for configuration specifications where the top-level specification
+-- is named with the empty string.
+--
+-- For more control, use 'generateDocs''
+generateDocs :: ValueSpecs a -> Text
+generateDocs spec = Text.unlines
+  ("Configuration file format:"
+   : concatMap fieldLines top
+  ++ concatMap sectionLines (Map.toList (Map.delete "" m)))
 
-sectionDoc :: SectionSpec a -> [String]
-sectionDoc (ReqSection name desc w) =
-  case valuesDoc w of
-    ShortDoc txt -> [Text.unpack name ++ " :: " ++ txt ++ "; " ++ Text.unpack desc]
-    LongDoc txts ->
-      (Text.unpack name ++ " :: section; " ++ Text.unpack desc)
-      : map ("    "++)txts
-sectionDoc (OptSection name desc w) =
-  case valuesDoc w of
-    ShortDoc txt -> [Text.unpack name ++ " :: optional " ++ txt ++ "; " ++ Text.unpack desc]
-    LongDoc txts ->
-      (Text.unpack name ++ " :: optional section; " ++ Text.unpack desc)
-      : map ("    "++)txts
+  where
+    Just top = Map.lookup "" m
 
-data DocLines = ShortDoc String | LongDoc [String]
+    DocBuilder (m,"") = valuesDoc spec
 
-valuesDoc :: ValuesSpec a -> DocLines
-valuesDoc = flattenOptions . runValuesSpec_ (pure . valueDoc)
+    sectionLines (name, fields)
+      = ""
+      : ("subsection " <> name)
+      : concatMap fieldLines fields
 
-inflateOptions :: DocLines -> [[DocLines]]
-inflateOptions x = [[x]]
+    fieldLines (KeyValueDoc field desc ty) =
+      ("    " <> field <> " :: " <> ty)
+      : if Text.null desc then [] else ["       " <> desc]
 
-flattenOptions :: [[DocLines]] -> DocLines
-flattenOptions [[LongDoc x]] = LongDoc x
-flattenOptions xs
-  = ShortDoc
-  . intercalate " or "
-  . map (conjunction . map simpleDocString)
-  $ xs
+
+generateDocs' :: ValueSpecs a -> (Map Text [KeyValueDoc], Text)
+generateDocs' spec = x
+  where DocBuilder x = valuesDoc spec
+
+sectionsDoc :: SectionSpecs a -> DocBuilder [KeyValueDoc]
+sectionsDoc spec = runSections_ (fmap pure . sectionDoc) spec
+
+sectionDoc :: SectionSpec a -> DocBuilder KeyValueDoc
+sectionDoc (ReqSection name desc w) = KeyValueDoc name desc <$> valuesDoc w
+sectionDoc (OptSection name desc w) = KeyValueDoc name desc <$> valuesDoc w -- XXX mark optional
+
+valuesDoc :: ValueSpecs a -> DocBuilder Text
+valuesDoc =
+  fmap flattenOptions . foldMap (fmap (:[])) . runValueSpecs_ (fmap (:[]) . valueDoc)
+
+
+flattenOptions :: [[Text]] -> Text
+flattenOptions [] = "impossible"
+flattenOptions xs = Text.intercalate " or " (map conjunction xs)
 
 
 -- | Explain a conjunction of docstrings
-conjunction :: [String] -> String
+conjunction :: [Text] -> Text
 conjunction [] = "ignored"
-conjunction xs = intercalate " and " xs
+conjunction xs = Text.intercalate " and " xs
 
 
-simpleDocString :: DocLines -> String
-simpleDocString (ShortDoc x) = x
-simpleDocString (LongDoc _) = "complex"
-
-valueDoc :: ValueSpec a -> DocLines
+valueDoc :: ValueSpec a -> DocBuilder Text
 valueDoc w =
   case w of
-    TextSpec       -> ShortDoc "text"
-    IntegerSpec    -> ShortDoc "integer"
-    RationalSpec   -> ShortDoc "number"
-    AtomSpec a     -> ShortDoc ("`" ++ Text.unpack a ++ "`")
-    AnyAtomSpec    -> ShortDoc "atom"
-    SectionsSpec s -> LongDoc (sectionsDoc s)
-    CustomSpec _lbl w _ -> valuesDoc w -- XXX Add label into docs
-    ListSpec ws    ->
-      case valuesDoc ws of
-        ShortDoc x -> ShortDoc ("list of " ++ x)
-        LongDoc xs -> LongDoc ("list of" : map ("    "++) xs)
+    TextSpec         -> docBuilder "text"
+    IntegerSpec      -> docBuilder "integer"
+    RationalSpec     -> docBuilder "number"
+    AtomSpec a       -> docBuilder ("`" <> a <> "`")
+    AnyAtomSpec      -> docBuilder "atom"
+
+    SectionSpecs l s -> DocBuilder (Map.insert l xs m, l)
+        where DocBuilder (m,xs) = sectionsDoc s
+
+    CustomSpec l w' _ -> ((l <> " ") <>) <$> valuesDoc w'
+    ListSpec ws -> ("list of " <>) <$> valuesDoc ws
+
+data KeyValueDoc = KeyValueDoc Text Text Text
+  deriving (Read,Show)
+
+newtype DocBuilder a = DocBuilder (Map Text [KeyValueDoc], a)
+  deriving (Functor, Monoid, Read, Show)
+
+docBuilder :: a -> DocBuilder a
+docBuilder x = DocBuilder (mempty, x)
