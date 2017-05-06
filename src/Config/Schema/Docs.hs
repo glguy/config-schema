@@ -2,7 +2,7 @@
 
 {-|
 Module      : Config.Schema.Docs
-Description : 
+Description : Documentation generation for config schemas
 Copyright   : (c) Eric Mertens, 2017
 License     : ISC
 Maintainer  : emertens@gmail.com
@@ -10,12 +10,9 @@ Maintainer  : emertens@gmail.com
 -}
 module Config.Schema.Docs where
 
-import           Control.Applicative (Alternative, Const(..))
-import           Data.Functor.Compose (Compose(..))
 import           Data.List (intercalate)
 import qualified Data.Text as Text
 
-import           Config
 import           Config.Schema.Spec
 
 sectionsDoc :: SectionsSpec a -> [String]
@@ -38,7 +35,7 @@ sectionDoc (OptSection name desc w) =
 data DocLines = ShortDoc String | LongDoc [String]
 
 valuesDoc :: ValuesSpec a -> DocLines
-valuesDoc = flattenOptions . lowerChoices . runValuesSpec (liftChoices . inflateOptions . valueDoc)
+valuesDoc = flattenOptions . runValuesSpec_ (pure . valueDoc)
 
 inflateOptions :: DocLines -> [[DocLines]]
 inflateOptions x = [[x]]
@@ -66,24 +63,13 @@ valueDoc :: ValueSpec a -> DocLines
 valueDoc w =
   case w of
     TextSpec       -> ShortDoc "text"
-    NumberSpec     -> ShortDoc "number"
-    AtomSpec a     -> ShortDoc ("`" ++ Text.unpack (atomName a) ++ "`")
+    IntegerSpec    -> ShortDoc "integer"
+    RationalSpec   -> ShortDoc "number"
+    AtomSpec a     -> ShortDoc ("`" ++ Text.unpack a ++ "`")
+    AnyAtomSpec    -> ShortDoc "atom"
     SectionsSpec s -> LongDoc (sectionsDoc s)
+    CustomSpec _lbl w _ -> valuesDoc w -- XXX Add label into docs
     ListSpec ws    ->
       case valuesDoc ws of
         ShortDoc x -> ShortDoc ("list of " ++ x)
         LongDoc xs -> LongDoc ("list of" : map ("    "++) xs)
-
-
-------------------------------------------------------------------------
--- Gathered choices
-------------------------------------------------------------------------
-
-newtype Choices f m a = Choices { unChoices :: Compose f (Const m) a }
-  deriving (Functor, Applicative, Alternative)
-
-liftChoices :: Functor f => f m -> Choices f m a
-liftChoices = Choices . Compose . fmap Const
-
-lowerChoices :: Functor f => Choices f m a -> f m
-lowerChoices = fmap getConst . getCompose . unChoices

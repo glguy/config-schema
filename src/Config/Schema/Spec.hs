@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, GADTs, KindSignatures, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances, RankNTypes, GADTs, KindSignatures, GeneralizedNewtypeDeriving #-}
 
 {-|
 Module      : Config.Schema.Spec
@@ -10,13 +10,11 @@ Maintainer  : emertens@gmail.com
 -}
 module Config.Schema.Spec where
 
-import Control.Alternative.Free         (Alt, liftAlt, runAlt)
-import Control.Applicative              (Alternative(..))
-import Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
-import Data.Functor.Coyoneda
-import Data.Text                        (Text)
-
-import Config
+import           Control.Applicative              (Alternative(..))
+import           Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
+import           Data.Functor.Compose
+import           Data.Text                        (Text)
+import qualified Data.Text as Text
 
 ------------------------------------------------------------------------
 -- Specifications for sections
@@ -86,22 +84,28 @@ optSection' n i w = sectionSpec (OptSection n i w)
 
 data ValueSpec :: * -> * where
   TextSpec     ::                   ValueSpec Text
-  NumberSpec   ::                   ValueSpec Integer
-  AtomSpec     :: Atom           -> ValueSpec ()
+  IntegerSpec  ::                   ValueSpec Integer
+  RationalSpec ::                   ValueSpec Rational
+  AnyAtomSpec  ::                   ValueSpec Text
+  AtomSpec     :: Text           -> ValueSpec ()
   ListSpec     :: ValuesSpec   a -> ValueSpec [a]
   SectionsSpec :: SectionsSpec a -> ValueSpec a
+  CustomSpec   :: Text -> ValuesSpec a -> (a -> Maybe b) -> ValueSpec b
 
 
-newtype ValuesSpec a = MkValuesSpec (Alt (Coyoneda ValueSpec) a)
+newtype ValuesSpec a = MkValuesSpec { unValueSpec :: Compose [] (Ap ValueSpec) a }
   deriving (Functor, Applicative, Alternative)
 
 
-runValuesSpec :: Alternative f => (forall x. ValueSpec x -> f x) -> ValuesSpec a -> f a
-runValuesSpec f (MkValuesSpec s) = runAlt (lowerCoyoneda . hoistCoyoneda f) s
+runValuesSpec :: Applicative f => (forall x. ValueSpec x -> f x) -> ValuesSpec a -> [f a]
+runValuesSpec f =  map (runAp f) . getCompose . unValueSpec
+
+runValuesSpec_ :: Monoid m => (forall x. ValueSpec x -> m) -> ValuesSpec a -> [m]
+runValuesSpec_ f = map (runAp_ f) . getCompose . unValueSpec
 
 
 valueSpec :: ValueSpec a -> ValuesSpec a
-valueSpec = MkValuesSpec . liftAlt . liftCoyoneda
+valueSpec = MkValuesSpec . Compose . pure . liftAp
 
 
 ------------------------------------------------------------------------
@@ -112,14 +116,24 @@ valueSpec = MkValuesSpec . liftAlt . liftCoyoneda
 -- | Class for things that are easy to want
 class    Spec a       where valuesSpec :: ValuesSpec a
 instance Spec Text    where valuesSpec = valueSpec TextSpec
-instance Spec Integer where valuesSpec = valueSpec NumberSpec
+instance Spec Integer where valuesSpec = valueSpec IntegerSpec
+instance Spec Int     where valuesSpec = fromInteger <$> valuesSpec
+instance Spec Rational where valuesSpec = valueSpec RationalSpec
 instance Spec a => Spec [a] where valuesSpec = valueSpec (ListSpec valuesSpec)
 instance (Spec a, Spec b) => Spec (Either a b) where valuesSpec = valuesSpec <|> valuesSpec
 
 
 atomSpec :: Text -> ValuesSpec ()
-atomSpec = valueSpec . AtomSpec . MkAtom
+atomSpec = valueSpec . AtomSpec
 
+anyAtomSpec :: ValuesSpec Text
+anyAtomSpec = valueSpec AnyAtomSpec
+
+stringSpec :: ValuesSpec String
+stringSpec = Text.unpack <$> valuesSpec
+
+numSpec :: Num a => ValuesSpec a
+numSpec = fromInteger <$> valuesSpec
 
 listSpec :: ValuesSpec a -> ValuesSpec [a]
 listSpec = valueSpec . ListSpec
@@ -133,9 +147,5 @@ oneOrList :: ValuesSpec a -> ValuesSpec [a]
 oneOrList s = (:[]) <$> s <|> listSpec s
 
 
-------------------------------------------------------------------------
-
--- | Given a natural transformation from @f@ to @g@ this gives a
--- natural transformatin from @Coyoneda f@ to @Coyoneda g@.
-hoistCoyoneda :: (forall x. f x -> g x) -> Coyoneda f a -> Coyoneda g a
-hoistCoyoneda f (Coyoneda g x) = Coyoneda g (f x)
+customSpec :: Text -> ValuesSpec a -> (a -> Maybe b) -> ValuesSpec b
+customSpec lbl w f = valueSpec (CustomSpec lbl w f)

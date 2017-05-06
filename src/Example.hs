@@ -11,15 +11,15 @@ import           Config.Schema
 
 exampleFile :: Text
 exampleFile =
-  " name: \"Johny Appleseed\"\n\
-  \ age : 99\n\
-  \ happy: yes\n\
-  \ kids:\n\
-  \   * \"Bob\"\n\
-  \   * \"Tom\"\n"
+  " name: \"Johny Appleseed\" \n\
+  \ age : 99                  \n\
+  \ happy: yes                \n\
+  \ kids:                     \n\
+  \   * \"Bob\"               \n\
+  \   * \"Tom\"               \n"
 
-exampleSections :: [Section]
-Right (Sections exampleSections) = parse exampleFile
+exampleValue :: Value
+Right exampleValue = parse exampleFile
 
 exampleSpec :: SectionsSpec Text
 exampleSpec =
@@ -52,7 +52,7 @@ printDoc = putStr $ unlines $ sectionsDoc exampleSpec
 -- happy :: optional `yes` or `no`; Current happiness status
 -- kids :: text or list of text; All children
 
-exampleVal :: Maybe Text
-exampleVal = getSections exampleSpec exampleSections
+example :: Either [LoadError] Text
+example = loadSections exampleSpec exampleValue
 -- *Example> exampleVal
--- Just "Johny Appleseed is 99 years old and has kids Bob, Tom and is happy"
+-- Right "Johny Appleseed is 99 years old and has kids Bob, Tom and is happy"
