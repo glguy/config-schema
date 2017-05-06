@@ -17,6 +17,8 @@ module Config.Schema.Docs
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid
+import           Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -61,19 +63,11 @@ sectionDoc (ReqSection name desc w) = KeyValueDoc True name desc <$> valuesDoc w
 sectionDoc (OptSection name desc w) = KeyValueDoc False name desc <$> valuesDoc w -- XXX mark optional
 
 valuesDoc :: ValueSpecs a -> DocBuilder Text
-valuesDoc =
-  fmap flattenOptions . foldMap (fmap (:[])) . runValueSpecs_ (fmap (:[]) . valueDoc)
+valuesDoc = fmap flattenOptions . sequenceA . runValueSpecs_ valueDoc
 
 
-flattenOptions :: [[Text]] -> Text
-flattenOptions [] = "impossible"
-flattenOptions xs = Text.intercalate " or " (map conjunction xs)
-
-
--- | Explain a conjunction of docstrings
-conjunction :: [Text] -> Text
-conjunction [] = "ignored"
-conjunction xs = Text.intercalate " and " xs
+flattenOptions :: NonEmpty Text -> Text
+flattenOptions = Text.intercalate " or " . NonEmpty.toList
 
 
 valueDoc :: ValueSpec a -> DocBuilder Text
@@ -100,7 +94,7 @@ data KeyValueDoc
   deriving (Read,Show)
 
 newtype DocBuilder a = DocBuilder (Map Text [KeyValueDoc], a)
-  deriving (Functor, Monoid, Read, Show)
+  deriving (Functor, Applicative, Monad, Monoid, Read, Show)
 
 docBuilder :: a -> DocBuilder a
 docBuilder x = DocBuilder (mempty, x)

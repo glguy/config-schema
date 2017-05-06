@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleInstances, RankNTypes, GADTs, KindSignatures, GeneralizedNewtypeDeriving #-}
+{-# Language FlexibleInstances, RankNTypes, GADTs, KindSignatures #-}
+{-# Language GeneralizedNewtypeDeriving #-}
 
 {-|
 Module      : Config.Schema.Spec
@@ -10,9 +11,11 @@ Maintainer  : emertens@gmail.com
 -}
 module Config.Schema.Spec where
 
-import           Control.Applicative              (Alternative(..))
 import           Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
-import           Data.Functor.Compose
+import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, lowerCoyoneda)
+import           Data.Functor.Compose             (Compose(..), getCompose)
+import           Data.Functor.Alt                 (Alt(..))
+import           Data.List.NonEmpty               (NonEmpty)
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
 
@@ -111,19 +114,21 @@ data ValueSpec :: * -> * where
   NamedSpec :: Text -> ValueSpecs a -> ValueSpec a
 
 
-newtype ValueSpecs a = MkValueSpecs { unValueSpec :: Compose [] (Ap ValueSpec) a }
-  deriving (Functor, Applicative, Alternative)
+newtype ValueSpecs a = MkValueSpecs { unValueSpecs :: Compose NonEmpty (Coyoneda ValueSpec) a }
+  deriving (Functor)
+
+instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (x <!> y)
 
 
-runValueSpecs :: Applicative f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> [f a]
-runValueSpecs f =  map (runAp f) . getCompose . unValueSpec
+runValueSpecs :: Functor f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> NonEmpty (f a)
+runValueSpecs f =  fmap (lowerCoyoneda . hoistCoyoneda f) . getCompose . unValueSpecs
 
-runValueSpecs_ :: Monoid m => (forall x. ValueSpec x -> m) -> ValueSpecs a -> [m]
-runValueSpecs_ f = map (runAp_ f) . getCompose . unValueSpec
+runValueSpecs_ :: (forall x. ValueSpec x -> m) -> ValueSpecs a -> NonEmpty m
+runValueSpecs_ f = fmap (\(Coyoneda _ x) -> f x) . getCompose . unValueSpecs
 
 
 valueSpec :: ValueSpec a -> ValueSpecs a
-valueSpec = MkValueSpecs . Compose . pure . liftAp
+valueSpec = MkValueSpecs . Compose . pure . liftCoyoneda
 
 
 ------------------------------------------------------------------------
@@ -135,10 +140,11 @@ valueSpec = MkValueSpecs . Compose . pure . liftAp
 class    Spec a       where valuesSpec :: ValueSpecs a
 instance Spec Text    where valuesSpec = valueSpec TextSpec
 instance Spec Integer where valuesSpec = valueSpec IntegerSpec
-instance Spec Int     where valuesSpec = fromInteger <$> valuesSpec
 instance Spec Rational where valuesSpec = valueSpec RationalSpec
+instance Spec Int     where valuesSpec = fromInteger <$> valuesSpec
 instance Spec a => Spec [a] where valuesSpec = valueSpec (ListSpec valuesSpec)
-instance (Spec a, Spec b) => Spec (Either a b) where valuesSpec = valuesSpec <|> valuesSpec
+instance (Spec a, Spec b) => Spec (Either a b) where
+  valuesSpec = Left <$> valuesSpec <!> Right <$> valuesSpec
 
 
 atomSpec :: Text -> ValueSpecs ()
@@ -171,8 +177,13 @@ namedSpec n s = valueSpec (NamedSpec n s)
 
 
 oneOrList :: ValueSpecs a -> ValueSpecs [a]
-oneOrList s = (:[]) <$> s <|> listSpec s
+oneOrList s = pure <$> s <!> listSpec s
 
 
 customSpec :: Text -> ValueSpecs a -> (a -> Maybe b) -> ValueSpecs b
 customSpec lbl w f = valueSpec (CustomSpec lbl w f)
+
+------------------------------------------------------------------------
+
+hoistCoyoneda :: (forall x. f x -> g x) -> Coyoneda f a -> Coyoneda g a
+hoistCoyoneda f (Coyoneda g x) = Coyoneda g (f x)
