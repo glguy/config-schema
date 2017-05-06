@@ -64,6 +64,7 @@ getValue1 (List xs)      (ListSpec w)       = scopedTraverse (getValue w) xs
 getValue1 (Atom b)       AnyAtomSpec        = pure (atomName b)
 getValue1 (Atom b)       (AtomSpec a)       = unless (a == atomName b) (loadFail (AtomMismatch a))
 getValue1 (Sections s)   (SectionSpecs _ w) = getSections w s
+getValue1 v              (NamedSpec _ w)    = getValue w v
 getValue1 v              (CustomSpec l w f) =
   do x <- getValue w v
      case f x of

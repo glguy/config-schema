@@ -31,20 +31,21 @@ generateDocs :: ValueSpecs a -> Text
 generateDocs spec = Text.unlines
   ("Configuration file format:"
    : concatMap fieldLines top
-  ++ concatMap sectionLines (Map.toList (Map.delete "" m)))
+  ++ concatMap sectionLines (Map.toList (Map.delete topname m)))
 
   where
-    Just top = Map.lookup "" m
-
+    topname = ""
+    Just top = Map.lookup topname m
     DocBuilder (m,"") = valuesDoc spec
 
     sectionLines (name, fields)
       = ""
-      : ("subsection " <> name)
+      : name
       : concatMap fieldLines fields
 
-    fieldLines (KeyValueDoc field desc ty) =
-      ("    " <> field <> " :: " <> ty)
+    fieldLines (NamedDoc ty) = ["    " <> ty]
+    fieldLines (KeyValueDoc isReq field desc ty) =
+      ("    " <> (if isReq then "req " else "") <> field <> ": " <> ty)
       : if Text.null desc then [] else ["       " <> desc]
 
 
@@ -56,8 +57,8 @@ sectionsDoc :: SectionSpecs a -> DocBuilder [KeyValueDoc]
 sectionsDoc spec = runSections_ (fmap pure . sectionDoc) spec
 
 sectionDoc :: SectionSpec a -> DocBuilder KeyValueDoc
-sectionDoc (ReqSection name desc w) = KeyValueDoc name desc <$> valuesDoc w
-sectionDoc (OptSection name desc w) = KeyValueDoc name desc <$> valuesDoc w -- XXX mark optional
+sectionDoc (ReqSection name desc w) = KeyValueDoc True name desc <$> valuesDoc w
+sectionDoc (OptSection name desc w) = KeyValueDoc False name desc <$> valuesDoc w -- XXX mark optional
 
 valuesDoc :: ValueSpecs a -> DocBuilder Text
 valuesDoc =
@@ -87,10 +88,15 @@ valueDoc w =
     SectionSpecs l s -> DocBuilder (Map.insert l xs m, l)
         where DocBuilder (m,xs) = sectionsDoc s
 
+    NamedSpec l s -> DocBuilder (Map.insert l [NamedDoc xs] m, l)
+        where DocBuilder (m,xs) = valuesDoc s
+
     CustomSpec l w' _ -> ((l <> " ") <>) <$> valuesDoc w'
     ListSpec ws -> ("list of " <>) <$> valuesDoc ws
 
-data KeyValueDoc = KeyValueDoc Text Text Text
+data KeyValueDoc
+  = KeyValueDoc Bool Text Text Text
+  | NamedDoc Text
   deriving (Read,Show)
 
 newtype DocBuilder a = DocBuilder (Map Text [KeyValueDoc], a)

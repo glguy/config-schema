@@ -107,6 +107,9 @@ data ValueSpec :: * -> * where
   -- | Documentation text, underlying specification, and filtering function
   CustomSpec :: Text -> ValueSpecs a -> (a -> Maybe b) -> ValueSpec b
 
+  -- | Label used to hide complicated specs in documentation
+  NamedSpec :: Text -> ValueSpecs a -> ValueSpec a
+
 
 newtype ValueSpecs a = MkValueSpecs { unValueSpec :: Compose [] (Ap ValueSpec) a }
   deriving (Functor, Applicative, Alternative)
@@ -161,6 +164,10 @@ sectionsSpec ::
   SectionSpecs a {- ^ underlying specification        -} ->
   ValueSpecs a
 sectionsSpec i s = valueSpec (SectionSpecs i s)
+
+
+namedSpec :: Text -> ValueSpecs a -> ValueSpecs a
+namedSpec n s = valueSpec (NamedSpec n s)
 
 
 oneOrList :: ValueSpecs a -> ValueSpecs [a]
