@@ -1,5 +1,5 @@
 {-# Language FlexibleInstances, RankNTypes, GADTs, KindSignatures #-}
-{-# Language GeneralizedNewtypeDeriving #-}
+{-# Language GeneralizedNewtypeDeriving, OverloadedStrings #-}
 
 {-|
 Module      : Config.Schema.Spec
@@ -44,6 +44,8 @@ module Config.Schema.Spec
   , stringSpec
   , numSpec
   , fractionalSpec
+  , nonemptySpec
+  , oneOrNonemptySpec
 
   -- * Executing specifications
   , runSections
@@ -65,6 +67,7 @@ import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, l
 import           Data.Functor.Compose             (Compose(..), getCompose)
 import           Data.Functor.Alt                 (Alt(..))
 import           Data.List.NonEmpty               (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
 
@@ -317,6 +320,19 @@ customSpec lbl w f = liftValueSpec (CustomSpec lbl (f <$> w))
 yesOrNoSpec :: ValueSpecs Bool
 yesOrNoSpec = True  <$ atomSpec (Text.pack "yes")
           <!> False <$ atomSpec (Text.pack "no")
+
+
+-- | Matches a non-empty list.
+--
+-- @since 0.1.1.0
+nonemptySpec :: ValueSpecs a -> ValueSpecs (NonEmpty a)
+nonemptySpec s = customSpec "nonempty" (listSpec s) NonEmpty.nonEmpty
+
+-- | Matches a single element or a non-empty list.
+--
+-- @since 0.1.1.0
+oneOrNonemptySpec :: ValueSpecs a -> ValueSpecs (NonEmpty a)
+oneOrNonemptySpec s = pure <$> s <!> nonemptySpec s
 
 ------------------------------------------------------------------------
 
