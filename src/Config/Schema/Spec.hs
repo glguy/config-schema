@@ -3,7 +3,7 @@
 
 {-|
 Module      : Config.Schema.Spec
-Description : 
+Description : Types and operations for describing a configuration file format.
 Copyright   : (c) Eric Mertens, 2017
 License     : ISC
 Maintainer  : emertens@gmail.com
@@ -12,6 +12,7 @@ Maintainer  : emertens@gmail.com
 module Config.Schema.Spec where
 
 import           Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
+import           Data.Functor.Const               (Const(..))
 import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, lowerCoyoneda)
 import           Data.Functor.Compose             (Compose(..), getCompose)
 import           Data.Functor.Alt                 (Alt(..))
@@ -23,15 +24,24 @@ import qualified Data.Text as Text
 -- Specifications for sections
 ------------------------------------------------------------------------
 
+-- | Specifications for single configuration sections.
+--
+-- The fields are section name, documentation text, value specification.
+-- Use 'ReqSection' for required key-value pairs and 'OptSection' for
+-- optional ones.
 data SectionSpec :: * -> * where
   ReqSection :: Text -> Text -> ValueSpecs a -> SectionSpec a
   OptSection :: Text -> Text -> ValueSpecs a -> SectionSpec (Maybe a)
 
 
+-- | A list of section specifiations used to process a whole group of
+-- key-value pairs. Multiple section specifications can be combined
+-- using this type's 'Applicative' instance.
 newtype SectionSpecs a = MkSectionSpecs (Ap SectionSpec a)
   deriving (Functor, Applicative)
 
 
+-- | Lift a single specification into a list of specifications.
 sectionSpec :: SectionSpec a -> SectionSpecs a
 sectionSpec = MkSectionSpecs . liftAp
 
@@ -107,15 +117,15 @@ data ValueSpec :: * -> * where
   -- | Documentation identifier and section specification
   SectionSpecs :: Text -> SectionSpecs a -> ValueSpec a
 
-  -- | Documentation text, underlying specification, and filtering function
-  CustomSpec :: Text -> ValueSpecs a -> (a -> Maybe b) -> ValueSpec b
+  -- | Documentation text, underlying specification
+  CustomSpec :: Text -> ValueSpecs (Maybe a) -> ValueSpec a
 
   -- | Label used to hide complicated specs in documentation
   NamedSpec :: Text -> ValueSpecs a -> ValueSpec a
 
 
 newtype ValueSpecs a = MkValueSpecs { unValueSpecs :: Compose NonEmpty (Coyoneda ValueSpec) a }
-  deriving (Functor)
+  deriving Functor
 
 instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (x <!> y)
 
@@ -123,8 +133,9 @@ instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (
 runValueSpecs :: Functor f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> NonEmpty (f a)
 runValueSpecs f =  fmap (lowerCoyoneda . hoistCoyoneda f) . getCompose . unValueSpecs
 
+
 runValueSpecs_ :: (forall x. ValueSpec x -> m) -> ValueSpecs a -> NonEmpty m
-runValueSpecs_ f = fmap (\(Coyoneda _ x) -> f x) . getCompose . unValueSpecs
+runValueSpecs_ f = fmap getConst . runValueSpecs (Const . f)
 
 
 valueSpec :: ValueSpec a -> ValueSpecs a
@@ -181,7 +192,7 @@ oneOrList s = pure <$> s <!> listSpec s
 
 
 customSpec :: Text -> ValueSpecs a -> (a -> Maybe b) -> ValueSpecs b
-customSpec lbl w f = valueSpec (CustomSpec lbl w f)
+customSpec lbl w f = valueSpec (CustomSpec lbl (f <$> w))
 
 ------------------------------------------------------------------------
 

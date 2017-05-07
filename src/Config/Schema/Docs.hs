@@ -47,7 +47,7 @@ generateDocs spec = Text.unlines
 
     fieldLines (NamedDoc ty) = ["    " <> ty]
     fieldLines (KeyValueDoc isReq field desc ty) =
-      ("    " <> (if isReq then "req " else "") <> field <> ": " <> ty)
+      ("    " <> field <> ": " <> (if isReq then "required " else "") <> ty)
       : if Text.null desc then [] else ["       " <> desc]
 
 
@@ -60,7 +60,7 @@ sectionsDoc spec = runSections_ (fmap pure . sectionDoc) spec
 
 sectionDoc :: SectionSpec a -> DocBuilder KeyValueDoc
 sectionDoc (ReqSection name desc w) = KeyValueDoc True name desc <$> valuesDoc w
-sectionDoc (OptSection name desc w) = KeyValueDoc False name desc <$> valuesDoc w -- XXX mark optional
+sectionDoc (OptSection name desc w) = KeyValueDoc False name desc <$> valuesDoc w
 
 valuesDoc :: ValueSpecs a -> DocBuilder Text
 valuesDoc = fmap flattenOptions . sequenceA . runValueSpecs_ valueDoc
@@ -73,19 +73,19 @@ flattenOptions = Text.intercalate " or " . NonEmpty.toList
 valueDoc :: ValueSpec a -> DocBuilder Text
 valueDoc w =
   case w of
-    TextSpec         -> docBuilder "text"
-    IntegerSpec      -> docBuilder "integer"
-    RationalSpec     -> docBuilder "number"
-    AtomSpec a       -> docBuilder ("`" <> a <> "`")
-    AnyAtomSpec      -> docBuilder "atom"
+    TextSpec         -> return "text"
+    IntegerSpec      -> return "integer"
+    RationalSpec     -> return "number"
+    AtomSpec a       -> return ("`" <> a <> "`")
+    AnyAtomSpec      -> return "atom"
 
-    SectionSpecs l s -> DocBuilder (Map.insert l xs m, l)
-        where DocBuilder (m,xs) = sectionsDoc s
+    SectionSpecs l s -> do xs <- sectionsDoc s
+                           emitDoc l xs
 
-    NamedSpec l s -> DocBuilder (Map.insert l [NamedDoc xs] m, l)
-        where DocBuilder (m,xs) = valuesDoc s
+    NamedSpec l s -> do xs <- valuesDoc s
+                        emitDoc l [NamedDoc xs]
 
-    CustomSpec l w' _ -> ((l <> " ") <>) <$> valuesDoc w'
+    CustomSpec l w' -> ((l <> " ") <>) <$> valuesDoc w'
     ListSpec ws -> ("list of " <>) <$> valuesDoc ws
 
 data KeyValueDoc
@@ -96,5 +96,5 @@ data KeyValueDoc
 newtype DocBuilder a = DocBuilder (Map Text [KeyValueDoc], a)
   deriving (Functor, Applicative, Monad, Monoid, Read, Show)
 
-docBuilder :: a -> DocBuilder a
-docBuilder x = DocBuilder (mempty, x)
+emitDoc :: Text -> [KeyValueDoc] -> DocBuilder Text
+emitDoc l xs = DocBuilder (Map.singleton l xs, l)

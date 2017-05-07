@@ -1,7 +1,7 @@
 {-# Language GeneralizedNewtypeDeriving, GADTs #-}
 {-|
 Module      : Config.Schema.Load
-Description : 
+Description : Operations to extract a value from a configuration.
 Copyright   : (c) Eric Mertens, 2017
 License     : ISC
 Maintainer  : emertens@gmail.com
@@ -60,21 +60,33 @@ getValue1 (Number _ n)   IntegerSpec        = pure n
 getValue1 (Floating a b) IntegerSpec        = maybe (loadFail TypeMismatch) pure (floatingToInteger a b)
 getValue1 (Number _ n)   RationalSpec       = pure (fromInteger n)
 getValue1 (Floating a b) RationalSpec       = pure (floatingToRational a b)
-getValue1 (List xs)      (ListSpec w)       = scopedTraverse (getValue w) xs
+getValue1 (List xs)      (ListSpec w)       = getList w xs
 getValue1 (Atom b)       AnyAtomSpec        = pure (atomName b)
 getValue1 (Atom b)       (AtomSpec a)       = unless (a == atomName b) (loadFail (AtomMismatch a))
 getValue1 (Sections s)   (SectionSpecs _ w) = getSections w s
 getValue1 v              (NamedSpec _ w)    = getValue w v
-getValue1 v              (CustomSpec l w f) =
-  do x <- getValue w v
-     case f x of
-       Nothing -> loadFail (CustomFail l)
-       Just y  -> pure y
+getValue1 v              (CustomSpec l w)   = getCustom l w v
 getValue1 _                  _              = loadFail TypeMismatch
 
 
-scopedTraverse :: (a -> Load b) -> [a] -> Load [b]
-scopedTraverse f = zipWithM (\i x -> scope (Text.pack (show i)) (f x)) [1::Int ..]
+-- | This operation processes all of the values in a list with the given
+-- value specification and updates the scope with a one-based list index.
+getList :: ValueSpecs a -> [Value] -> Load [a]
+getList w = zipWithM (\i x -> scope (Text.pack (show i)) (getValue w x)) [1::Int ..]
+
+
+-- | Match a value against its specification. If 'Just' is matched
+-- return the value. If 'Nothing is matched, report an error.
+getCustom ::
+  Text                 {- ^ label         -} ->
+  ValueSpecs (Maybe a) {- ^ specification -} ->
+  Value                {- ^ value         -} ->
+  Load a
+getCustom l w v =
+  do x <- getValue w v
+     case x of
+       Nothing -> loadFail (CustomFail l)
+       Just y  -> pure y
 
 
 -- | Extract a section from a list of sections by name.
