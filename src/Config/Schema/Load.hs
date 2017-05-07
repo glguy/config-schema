@@ -80,7 +80,7 @@ getValue1 v              (CustomSpec l w)   = getCustom l w v
 
 getValue1 _              TextSpec           = loadFail (SpecMismatch "text")
 getValue1 _              IntegerSpec        = loadFail (SpecMismatch "integer")
-getValue1 _              RationalSpec       = loadFail (SpecMismatch "rational")
+getValue1 _              RationalSpec       = loadFail (SpecMismatch "number")
 getValue1 _              ListSpec{}         = loadFail (SpecMismatch "list")
 getValue1 _              AnyAtomSpec        = loadFail (SpecMismatch "atom")
 getValue1 _              (AtomSpec a)       = loadFail (SpecMismatch ("`" <> a <> "`"))

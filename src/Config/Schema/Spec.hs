@@ -40,9 +40,10 @@ module Config.Schema.Spec
 
   -- * Derived specifications
   , oneOrList
-  , numSpec
   , yesOrNoSpec
   , stringSpec
+  , numSpec
+  , fractionalSpec
 
   -- * Executing specifications
   , runSections
@@ -52,7 +53,9 @@ module Config.Schema.Spec
 
   -- * Primitive specifications
   , SectionSpec(..)
+  , liftSectionSpec
   , ValueSpec(..)
+  , liftValueSpec
 
   ) where
 
@@ -91,14 +94,32 @@ newtype SectionSpecs a = MkSectionSpecs (Ap SectionSpec a)
 
 
 -- | Lift a single specification into a list of specifications.
-sectionSpec :: SectionSpec a -> SectionSpecs a
-sectionSpec = MkSectionSpecs . liftAp
+--
+-- @since 0.1.1.0
+liftSectionSpec :: SectionSpec a -> SectionSpecs a
+liftSectionSpec = MkSectionSpecs . liftAp
 
 
+-- | Given an function that handles a single, primitive section specification;
+-- 'runSections' will generate one that processes a whole 'SectionsSpec'.
+--
+-- The results from each section will be sequence together using the 'Applicative'
+-- instance in of the result type, and the results can be indexed by the type
+-- parameter of the specification.
+--
+-- For an example use of 'runSections', see "Config.Schema.Load".
 runSections :: Applicative f => (forall x. SectionSpec x -> f x) -> SectionSpecs a -> f a
 runSections f (MkSectionSpecs s) = runAp f s
 
 
+-- | Given an function that handles a single, primitive section specification;
+-- 'runSections_' will generate one that processes a whole 'SectionsSpec'.
+--
+-- The results from each section will be sequence together using the 'Monoid'
+-- instance in of the result type, and the results will not be indexed by the
+-- type parameter of the specifications.
+--
+-- For an example use of 'runSections_', see "Config.Schema.Docs".
 runSections_ :: Monoid m => (forall x. SectionSpec x -> m) -> SectionSpecs a -> m
 runSections_ f (MkSectionSpecs s) = runAp_ f s
 
@@ -114,7 +135,7 @@ reqSection ::
   Text {- ^ section name -} ->
   Text {- ^ description  -} ->
   SectionSpecs a
-reqSection n i = sectionSpec (ReqSection n i valuesSpec)
+reqSection n i = liftSectionSpec (ReqSection n i valuesSpec)
 
 
 -- | Specification for a required section with an explicit value specification.
@@ -123,7 +144,7 @@ reqSection' ::
   Text         {- ^ description         -} ->
   ValueSpecs a {- ^ value specification -} ->
   SectionSpecs a
-reqSection' n i w = sectionSpec (ReqSection n i w)
+reqSection' n i w = liftSectionSpec (ReqSection n i w)
 
 
 -- | Specification for an optional section with an implicit value specification.
@@ -132,7 +153,7 @@ optSection ::
   Text {- ^ section name -} ->
   Text {- ^ description  -} ->
   SectionSpecs (Maybe a)
-optSection n i = sectionSpec (OptSection n i valuesSpec)
+optSection n i = liftSectionSpec (OptSection n i valuesSpec)
 
 
 -- | Specification for an optional section with an explicit value specification.
@@ -141,7 +162,7 @@ optSection' ::
   Text         {- ^ description         -} ->
   ValueSpecs a {- ^ value specification -} ->
   SectionSpecs (Maybe a)
-optSection' n i w = sectionSpec (OptSection n i w)
+optSection' n i w = liftSectionSpec (OptSection n i w)
 
 
 ------------------------------------------------------------------------
@@ -161,7 +182,7 @@ data ValueSpec :: * -> * where
   RationalSpec :: ValueSpec Rational
 
   -- | Matches any atom
-  AnyAtomSpec  :: ValueSpec Text
+  AnyAtomSpec :: ValueSpec Text
 
   -- | Specific atom to be matched
   AtomSpec :: Text -> ValueSpec ()
@@ -205,8 +226,10 @@ runValueSpecs_ f = fmap getConst . runValueSpecs (Const . f)
 
 
 -- | Lift a primitive value specification to 'ValueSpecs'.
-valueSpec :: ValueSpec a -> ValueSpecs a
-valueSpec = MkValueSpecs . Compose . pure . liftCoyoneda
+--
+-- @since 0.1.1.0
+liftValueSpec :: ValueSpec a -> ValueSpecs a
+liftValueSpec = MkValueSpecs . Compose . pure . liftCoyoneda
 
 
 ------------------------------------------------------------------------
@@ -216,22 +239,22 @@ valueSpec = MkValueSpecs . Compose . pure . liftCoyoneda
 
 -- | Class of value specifications that don't require arguments.
 class    Spec a       where valuesSpec :: ValueSpecs a
-instance Spec Text    where valuesSpec = valueSpec TextSpec
-instance Spec Integer where valuesSpec = valueSpec IntegerSpec
-instance Spec Rational where valuesSpec = valueSpec RationalSpec
+instance Spec Text    where valuesSpec = liftValueSpec TextSpec
+instance Spec Integer where valuesSpec = liftValueSpec IntegerSpec
+instance Spec Rational where valuesSpec = liftValueSpec RationalSpec
 instance Spec Int     where valuesSpec = fromInteger <$> valuesSpec
-instance Spec a => Spec [a] where valuesSpec = valueSpec (ListSpec valuesSpec)
+instance Spec a => Spec [a] where valuesSpec = liftValueSpec (ListSpec valuesSpec)
 instance (Spec a, Spec b) => Spec (Either a b) where
   valuesSpec = Left <$> valuesSpec <!> Right <$> valuesSpec
 
 
 -- | Specification for matching a particular atom.
 atomSpec :: Text -> ValueSpecs ()
-atomSpec = valueSpec . AtomSpec
+atomSpec = liftValueSpec . AtomSpec
 
 -- | Specification for matching any atom. Matched atom is returned.
 anyAtomSpec :: ValueSpecs Text
-anyAtomSpec = valueSpec AnyAtomSpec
+anyAtomSpec = liftValueSpec AnyAtomSpec
 
 -- | Specification for matching any text as a 'String'
 stringSpec :: ValueSpecs String
@@ -241,10 +264,16 @@ stringSpec = Text.unpack <$> valuesSpec
 numSpec :: Num a => ValueSpecs a
 numSpec = fromInteger <$> valuesSpec
 
+-- | Specification for matching any fractional number.
+--
+-- @since 0.1.1.0
+fractionalSpec :: Fractional a => ValueSpecs a
+fractionalSpec = fromRational <$> valuesSpec
+
 -- | Specification for matching a list of values each satisfying a
 -- given element specification.
 listSpec :: ValueSpecs a -> ValueSpecs [a]
-listSpec = valueSpec . ListSpec
+listSpec = liftValueSpec . ListSpec
 
 
 -- | Named subsection value specification. The unique identifier will be used
@@ -254,7 +283,7 @@ sectionsSpec ::
   Text           {- ^ unique documentation identifier -} ->
   SectionSpecs a {- ^ underlying specification        -} ->
   ValueSpecs a
-sectionsSpec i s = valueSpec (SectionSpecs i s)
+sectionsSpec i s = liftValueSpec (SectionSpecs i s)
 
 
 -- | Named value specification. This is useful for factoring complicated
@@ -264,7 +293,7 @@ namedSpec ::
   Text         {- ^ name                     -} ->
   ValueSpecs a {- ^ underlying specification -} ->
   ValueSpecs a
-namedSpec n s = valueSpec (NamedSpec n s)
+namedSpec n s = liftValueSpec (NamedSpec n s)
 
 
 -- | Specification that matches either a single element or multiple
@@ -278,7 +307,7 @@ oneOrList s = pure <$> s <!> listSpec s
 -- to validate the value extracted by a specification. If 'Nothing'
 -- is returned the value is considered to have failed validation.
 customSpec :: Text -> ValueSpecs a -> (a -> Maybe b) -> ValueSpecs b
-customSpec lbl w f = valueSpec (CustomSpec lbl (f <$> w))
+customSpec lbl w f = liftValueSpec (CustomSpec lbl (f <$> w))
 
 
 -- | Specification for using @yes@ and @no@ to represent booleans 'True'
