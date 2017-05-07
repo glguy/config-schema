@@ -13,7 +13,7 @@ maintainer:          emertens@gmail.com
 copyright:           Eric Mertens 2017
 category:            Language
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+extra-source-files:  ChangeLog.md README.md
 cabal-version:       >=1.10
 homepage:            https://github.com/glguy/config-schema
 bug-reports:         https://github.com/glguy/config-schema/issues

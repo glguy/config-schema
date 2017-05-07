@@ -1,11 +1,11 @@
 {-# Language OverloadedStrings, ApplicativeDo #-}
 module Example where
 
-import           Control.Applicative
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import           Data.Text (Text)
 import           Data.Monoid ((<>))
+import           Data.Functor.Alt ((<!>))
 
 import           Config
 import           Config.Schema
@@ -45,17 +45,26 @@ kidSpec = sectionsSpec "kid" (reqSection "name" "Kid's name")
 
 -- | Matches the 'yes' and 'no' atoms
 yesOrNo :: ValueSpecs Bool
-yesOrNo = True  <$ atomSpec "yes" <|>
+yesOrNo = True  <$ atomSpec "yes" <!>
           False <$ atomSpec "no"
 
 
 printDoc :: IO ()
 printDoc = Text.putStr (generateDocs exampleSpec)
 -- *Example> printDoc
--- name :: text; Full name
--- age :: number; Age of user
--- happy :: optional `yes` or `no`; Current happiness status
--- kids :: text or list of text; All children
+-- Configuration file fields:
+--     name: REQUIRED text
+--        Full name
+--     age: REQUIRED integer
+--        Age of user
+--     happy: `yes` or `no`
+--        Current happiness status
+--     kids: REQUIRED kid or list of kid
+--        All children
+--
+-- kid
+--     name: REQUIRED text
+--        Kid's name
 
 example :: Either [LoadError] Text
 example = loadValue exampleSpec exampleValue
