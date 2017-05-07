@@ -203,6 +203,8 @@ data ValueSpec :: * -> * where
 -- | Non-empty disjunction of value specifications. This type is the primary
 -- way to specify expected values. Use the 'Spec' class to generate 'ValueSpecs'
 -- for simple types.
+--
+-- Multiple specifications can be combined using this type's 'Alt' instance.
 newtype ValueSpecs a = MkValueSpecs { unValueSpecs :: Compose NonEmpty (Coyoneda ValueSpec) a }
   deriving Functor
 
