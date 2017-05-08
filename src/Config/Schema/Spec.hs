@@ -32,6 +32,7 @@ module Config.Schema.Spec
   , ValueSpecs(..)
   , Spec(..)
   , sectionsSpec
+  , assocSpec
   , atomSpec
   , anyAtomSpec
   , listSpec
@@ -98,7 +99,7 @@ newtype SectionSpecs a = MkSectionSpecs (Ap SectionSpec a)
 
 -- | Lift a single specification into a list of specifications.
 --
--- @since 0.1.1.0
+-- @since 0.2.0.0
 liftSectionSpec :: SectionSpec a -> SectionSpecs a
 liftSectionSpec = MkSectionSpecs . liftAp
 
@@ -196,11 +197,16 @@ data ValueSpec :: * -> * where
   -- | Documentation identifier and section specification
   SectionSpecs :: Text -> SectionSpecs a -> ValueSpec a
 
+  -- | Matches an arbitrary list of sections. Similar to 'SectionSpec'
+  -- except that that the section names are user-defined.
+  AssocSpec :: ValueSpecs a -> ValueSpec [(Text,a)]
+
   -- | Documentation text, underlying specification
   CustomSpec :: Text -> ValueSpecs (Maybe a) -> ValueSpec a
 
   -- | Label used to hide complicated specs in documentation
   NamedSpec :: Text -> ValueSpecs a -> ValueSpec a
+
 
 
 -- | Non-empty disjunction of value specifications. This type is the primary
@@ -232,7 +238,7 @@ runValueSpecs_ f = fmap getConst . runValueSpecs (Const . f)
 
 -- | Lift a primitive value specification to 'ValueSpecs'.
 --
--- @since 0.1.1.0
+-- @since 0.2.0.0
 liftValueSpec :: ValueSpec a -> ValueSpecs a
 liftValueSpec = MkValueSpecs . Compose . pure . liftCoyoneda
 
@@ -271,7 +277,7 @@ numSpec = fromInteger <$> valuesSpec
 
 -- | Specification for matching any fractional number.
 --
--- @since 0.1.1.0
+-- @since 0.2.0.0
 fractionalSpec :: Fractional a => ValueSpecs a
 fractionalSpec = fromRational <$> valuesSpec
 
@@ -289,6 +295,17 @@ sectionsSpec ::
   SectionSpecs a {- ^ underlying specification        -} ->
   ValueSpecs a
 sectionsSpec i s = liftValueSpec (SectionSpecs i s)
+
+
+-- | Specification for a section list where the keys are user-defined.
+-- Values are matched against the underlying specification and returned
+-- as a list of section-name\/value pairs.
+--
+-- @since 0.3.0.0
+assocSpec ::
+  ValueSpecs a {- ^ underlying specification -} ->
+  ValueSpecs [(Text,a)]
+assocSpec = liftValueSpec . AssocSpec
 
 
 -- | Named value specification. This is useful for factoring complicated
@@ -324,13 +341,13 @@ yesOrNoSpec = True  <$ atomSpec (Text.pack "yes")
 
 -- | Matches a non-empty list.
 --
--- @since 0.1.1.0
+-- @since 0.2.0.0
 nonemptySpec :: ValueSpecs a -> ValueSpecs (NonEmpty a)
 nonemptySpec s = customSpec "nonempty" (listSpec s) NonEmpty.nonEmpty
 
 -- | Matches a single element or a non-empty list.
 --
--- @since 0.1.1.0
+-- @since 0.2.0.0
 oneOrNonemptySpec :: ValueSpecs a -> ValueSpecs (NonEmpty a)
 oneOrNonemptySpec s = pure <$> s <!> nonemptySpec s
 

@@ -1,5 +1,9 @@
 # Revision history for config-schema
 
+## 0.3.0.0  --
+
+* Added /association list/ specifications
+
 ## 0.2.0.0  -- 2017-05-07
 
 * Expose `liftValueSpec` and `liftSectionSpec`

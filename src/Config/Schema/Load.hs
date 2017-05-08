@@ -76,6 +76,7 @@ getValue1 (List xs)      (ListSpec w)       = getList w xs
 getValue1 (Atom b)       AnyAtomSpec        = pure (atomName b)
 getValue1 (Atom b)       (AtomSpec a) | a == atomName b = pure ()
 getValue1 (Sections s)   (SectionSpecs _ w) = getSections w s
+getValue1 (Sections s)   (AssocSpec w)      = getAssoc w s
 getValue1 v              (NamedSpec _ w)    = getValue w v
 getValue1 v              (CustomSpec l w)   = getCustom l w v
 
@@ -92,6 +93,13 @@ getValue1 _              (SectionSpecs l _) = loadFail (SpecMismatch l)
 -- value specification and updates the scope with a one-based list index.
 getList :: ValueSpecs a -> [Value] -> Load [a]
 getList w = zipWithM (\i x -> scope (Text.pack (show i)) (getValue w x)) [1::Int ..]
+
+
+-- | This operation processes all of the values in a section list
+-- against the given specification and associates them with the
+-- section name.
+getAssoc :: ValueSpecs a -> [Section] -> Load [(Text,a)]
+getAssoc w = traverse $ \(Section k v) -> (,) k <$> getValue w v
 
 
 -- | Match a value against its specification. If 'Just' is matched

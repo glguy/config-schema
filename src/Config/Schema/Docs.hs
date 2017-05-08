@@ -111,6 +111,7 @@ valueDoc w =
     NamedSpec    l s -> emitDoc l . pure =<< valuesDoc s
     CustomSpec l w'  -> ((l <> " ") <>) <$> valuesDoc w'
     ListSpec ws      -> ("list of " <>) <$> valuesDoc ws
+    AssocSpec ws     -> ("assocation list of " <>) <$> valuesDoc ws
 
 
 -- | A writer-like type. A mapping of section names and documentation
