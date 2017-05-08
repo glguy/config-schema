@@ -87,6 +87,7 @@ getValue1 _              ListSpec{}         = loadFail (SpecMismatch "list")
 getValue1 _              AnyAtomSpec        = loadFail (SpecMismatch "atom")
 getValue1 _              (AtomSpec a)       = loadFail (SpecMismatch ("`" <> a <> "`"))
 getValue1 _              (SectionSpecs l _) = loadFail (SpecMismatch l)
+getValue1 _              AssocSpec{}        = loadFail (SpecMismatch "association list")
 
 
 -- | This operation processes all of the values in a list with the given
