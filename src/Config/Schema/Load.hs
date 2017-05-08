@@ -18,15 +18,16 @@ module Config.Schema.Load
   , Problem(..)
   ) where
 
-import           Control.Applicative              (Alternative, optional)
-import           Control.Monad                    (MonadPlus, unless, zipWithM)
+import           Control.Monad                    (unless, zipWithM)
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.State        (StateT(..), runStateT)
-import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.Reader
-import           Data.Foldable                    (asum)
+import           Control.Monad.Trans.Except       (Except, runExcept, throwE)
+import           Control.Monad.Trans.Reader       (ReaderT, runReaderT, ask, local)
+import           Data.Functor.Alt                 (Alt((<!>)))
 import           Data.Monoid                      ((<>))
 import           Data.Ratio                       (numerator, denominator)
+import           Data.Semigroup.Foldable          (asum1)
+import           Data.List.NonEmpty               (NonEmpty)
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
 
@@ -38,9 +39,9 @@ import           Config.Schema.Spec
 -- the interpretation of that value or the list of errors
 -- encountered.
 loadValue ::
-  ValueSpecs a         {- ^ specification          -} ->
-  Value                {- ^ value                  -} ->
-  Either [LoadError] a {- ^ error or decoded value -}
+  ValueSpecs a                  {- ^ specification           -} ->
+  Value                         {- ^ value                   -} ->
+  Either (NonEmpty LoadError) a {- ^ errors or decoded value -}
 loadValue spec val = runLoad (getValue spec val)
 
 
@@ -49,7 +50,7 @@ getSection (ReqSection k _ w) =
   do v <- StateT (lookupSection k)
      lift (scope k (getValue w v))
 getSection (OptSection k _ w) =
-  do mb <- optional (StateT (lookupSection k))
+  do mb <- optional1 (StateT (lookupSection k))
      lift (traverse (scope k . getValue w) mb)
 
 
@@ -61,7 +62,7 @@ getSections p xs =
 
 
 getValue :: ValueSpecs a -> Value -> Load a
-getValue s v = asum (runValueSpecs (getValue1 v) s)
+getValue s v = asum1 (runValueSpecs (getValue1 v) s)
 
 
 -- | Match a primitive value specification against a single value.
@@ -109,8 +110,8 @@ getCustom l w v =
 
 -- | Extract a section from a list of sections by name.
 lookupSection ::
-  Text                     {- ^ section name                       -} ->
-  [Section]                {- ^ available sections                 -} ->
+  Text                    {- ^ section name                       -} ->
+  [Section]               {- ^ available sections                 -} ->
   Load (Value, [Section]) {- ^ found value and remaining sections -}
 lookupSection key [] = loadFail (MissingSection key)
 lookupSection key (s@(Section k v):xs)
@@ -140,8 +141,10 @@ floatingToInteger x y
 -- | Type used to match values against specifiations. This type tracks
 -- the current nested fields (updated with scope) and can throw
 -- errors using loadFail.
-newtype Load a = MkLoad { unLoad :: ReaderT [Text] (Except [LoadError]) a }
-  deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
+newtype Load a = MkLoad { unLoad :: ReaderT [Text] (Except (NonEmpty LoadError)) a }
+  deriving (Functor, Applicative, Monad)
+
+instance Alt Load where MkLoad x <!> MkLoad y = MkLoad (x <!> y)
 
 -- | Type for errors that can be encountered while decoding a value according
 -- to a specification. The error includes a key path indicating where in
@@ -152,7 +155,7 @@ data LoadError = LoadError [Text] Problem -- ^ path to problem and problem descr
 
 -- | Run the Load computation until it produces a result or terminates
 -- with a list of errors.
-runLoad :: Load a -> Either [LoadError] a
+runLoad :: Load a -> Either (NonEmpty LoadError) a
 runLoad = runExcept . flip runReaderT [] . unLoad
 
 
@@ -171,4 +174,11 @@ scope key (MkLoad m) = MkLoad (local (key:) m)
 loadFail :: Problem -> Load a
 loadFail cause = MkLoad $
   do path <- ask
-     lift (throwE [LoadError (reverse path) cause])
+     lift (throwE (pure (LoadError (reverse path) cause)))
+
+------------------------------------------------------------------------
+
+-- | One or none. This definition is different from the normal @optional@ definition
+-- because it uses 'Alt'. This allows it to work on types that are not @Alternative@.
+optional1 :: (Applicative f, Alt f) => f a -> f (Maybe a)
+optional1 fa = Just <$> fa <!> pure Nothing

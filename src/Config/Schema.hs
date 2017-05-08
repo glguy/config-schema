@@ -9,6 +9,10 @@ This package makes it possible to define schemas for configuration files.
 These schemas can be used to generate a validating configuration file
 loader, and to produce documentation about the supported format.
 
+For documentation on the
+<https://hackage.haskell.org/package/config-value config-value> file format, see the
+<https://hackage.haskell.org/package/config-value/docs/Config.html Config> module.
+
 "Config.Schema.Spec" provides definitions used to make new schemas.
 
 "Config.Schema.Load" uses schemas to match schemas against configuration values.

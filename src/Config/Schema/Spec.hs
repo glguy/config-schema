@@ -221,7 +221,7 @@ instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (
 -- Unlike 'runValueSpecs_', this allows the result of the interpretation to be indexed
 -- by the type of the primitive value specifications.
 runValueSpecs :: Functor f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> NonEmpty (f a)
-runValueSpecs f =  fmap (lowerCoyoneda . hoistCoyoneda f) . getCompose . unValueSpecs
+runValueSpecs f = fmap (lowerCoyoneda . hoistCoyoneda f) . getCompose . unValueSpecs
 
 
 -- | Given an interpretation of a primitive value specification, extract a list of

@@ -5,6 +5,7 @@
 * Expose `liftValueSpec` and `liftSectionSpec`
 * Add `fractionalSpec`
 * Add `nonemptySpec` and `oneOrNonemptySpec`
+* `loadValue` returns a `NonEmpty LoadError`
 
 ## 0.1.0.0  -- 2017-05-06
 
