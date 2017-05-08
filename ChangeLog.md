@@ -1,6 +1,6 @@
 # Revision history for config-schema
 
-## 0.1.1.0  -- YYYY-mm-dd
+## 0.2.0.0  -- 2017-05-07
 
 * Expose `liftValueSpec` and `liftSectionSpec`
 * Add `fractionalSpec`
