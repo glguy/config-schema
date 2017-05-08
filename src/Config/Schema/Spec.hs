@@ -64,7 +64,7 @@ module Config.Schema.Spec
 
 import           Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
 import           Data.Functor.Const               (Const(..))
-import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, lowerCoyoneda)
+import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, lowerCoyoneda, hoistCoyoneda)
 import           Data.Functor.Compose             (Compose(..), getCompose)
 import           Data.Functor.Alt                 (Alt(..))
 import           Data.List.NonEmpty               (NonEmpty)
@@ -350,10 +350,3 @@ nonemptySpec s = customSpec "nonempty" (listSpec s) NonEmpty.nonEmpty
 -- @since 0.2.0.0
 oneOrNonemptySpec :: ValueSpecs a -> ValueSpecs (NonEmpty a)
 oneOrNonemptySpec s = pure <$> s <!> nonemptySpec s
-
-------------------------------------------------------------------------
-
--- | Lift a natural transformation to be a natural transformation of
--- 'Coyoneda'.
-hoistCoyoneda :: (forall x. f x -> g x) -> (Coyoneda f a -> Coyoneda g a)
-hoistCoyoneda f (Coyoneda g x) = Coyoneda g (f x)
