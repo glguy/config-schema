@@ -6,6 +6,7 @@ import qualified Data.Text.IO as Text
 import           Data.Text (Text)
 import           Data.Monoid ((<>))
 import           Data.Functor.Alt ((<!>))
+import           Data.List.NonEmpty (NonEmpty)
 
 import           Config
 import           Config.Schema
@@ -66,7 +67,7 @@ printDoc = Text.putStr (generateDocs exampleSpec)
 --     name: REQUIRED text
 --        Kid's name
 
-example :: Either [LoadError] Text
+example :: Either (NonEmpty LoadError) Text
 example = loadValue exampleSpec exampleValue
 -- *Example> exampleVal
 -- Right "Johny Appleseed is 99 years old and has kids Bob, Tom and is happy"
