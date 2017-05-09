@@ -2,7 +2,6 @@
 module Example where
 
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import           Data.Text (Text)
 import           Data.Monoid ((<>))
 import           Data.Functor.Alt ((<!>))
@@ -20,7 +19,7 @@ exampleFile =
   \   * name: \"Bob\"         \n\
   \   * name: \"Tom\"         \n"
 
-exampleValue :: Value
+exampleValue :: Value Position
 Right exampleValue = parse exampleFile
 
 exampleSpec :: ValueSpecs Text
@@ -51,7 +50,7 @@ yesOrNo = True  <$ atomSpec "yes" <!>
 
 
 printDoc :: IO ()
-printDoc = Text.putStr (generateDocs exampleSpec)
+printDoc = print (generateDocs exampleSpec)
 -- *Example> printDoc
 -- Configuration file fields:
 --     name: REQUIRED text

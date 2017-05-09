@@ -227,15 +227,25 @@ instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (
 -- the possible interpretations of a disjunction of value specifications. Each of
 -- these primitive interpretations will be combined using the provided 'Alt' instance.
 runValueSpecs :: Alt f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> f a
-runValueSpecs f = asum1 . fmap (lowerCoyoneda . hoistCoyoneda f) . getCompose . unValueSpecs
+runValueSpecs f = asum1 . fmap (runCoyoneda f) . getCompose . unValueSpecs
 
 
 -- | Given an interpretation of a primitive value specification, extract a list of
 -- the possible interpretations of a disjunction of value specifications. Each of
 -- these primitive interpretations will be combined using the provided 'Semigroup' instance.
 runValueSpecs_ :: Semigroup m => (forall x. ValueSpec x -> m) -> ValueSpecs a -> m
-runValueSpecs_ f = foldMap1 (getConst . lowerCoyoneda . hoistCoyoneda (Const . f))
-                 . getCompose . unValueSpecs
+runValueSpecs_ f = foldMap1 (runCoyoneda_ f) . getCompose . unValueSpecs
+
+
+-- Helper for transforming the underlying type @f@ to one supporting a 'Functor'
+-- instance before lowering.
+runCoyoneda :: Functor g => (forall a. f a -> g a) -> Coyoneda f b -> g b
+runCoyoneda f = lowerCoyoneda . hoistCoyoneda f
+
+-- Helper for extracting the the value stored in a 'Coyoneda' while forgetting its
+-- type index.
+runCoyoneda_ :: (forall a. f a -> m) -> Coyoneda f b -> m
+runCoyoneda_ f = getConst . runCoyoneda (Const . f)
 
 
 -- | Lift a primitive value specification to 'ValueSpecs'.

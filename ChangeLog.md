@@ -3,6 +3,7 @@
 ## 0.3.0.0  --
 
 * Added /association list/ specifications
+* Use `pretty` library for documentation generation
 
 ## 0.2.0.0  -- 2017-05-07
 
