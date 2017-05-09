@@ -1,0 +1,3 @@
+packages:
+  config-schema.cabal
+  config-value/config-value.cabal
