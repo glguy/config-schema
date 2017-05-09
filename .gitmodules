@@ -1,0 +1,3 @@
+[submodule "config-value"]
+	path = config-value
+	url = https://github.com/glguy/config-value
