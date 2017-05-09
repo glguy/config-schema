@@ -39,8 +39,6 @@ module Config.Schema.Docs
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid
-import           Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -90,12 +88,12 @@ sectionDoc s =
 -- Any sections contained in the specification will be stored in the
 -- sections map.
 valuesDoc :: ValueSpecs a -> DocBuilder Text
-valuesDoc = fmap disjunction . sequenceA . runValueSpecs_ valueDoc
+valuesDoc = fmap disjunction . sequenceA . runValueSpecs_ (fmap pure valueDoc)
 
 
 -- | Combine a list of text with the word @or@.
-disjunction :: NonEmpty Text -> Text
-disjunction = Text.intercalate " or " . NonEmpty.toList
+disjunction :: [Text] -> Text
+disjunction = Text.intercalate " or "
 
 
 -- | Compute the documentation fragment for an individual value specification.

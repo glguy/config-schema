@@ -26,7 +26,6 @@ import           Control.Monad.Trans.Reader       (ReaderT, runReaderT, ask, loc
 import           Data.Functor.Alt                 (Alt((<!>)))
 import           Data.Monoid                      ((<>))
 import           Data.Ratio                       (numerator, denominator)
-import           Data.Semigroup.Foldable          (asum1)
 import           Data.List.NonEmpty               (NonEmpty)
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
@@ -62,7 +61,7 @@ getSections p xs =
 
 
 getValue :: ValueSpecs a -> Value -> Load a
-getValue s v = asum1 (runValueSpecs (getValue1 v) s)
+getValue s v = runValueSpecs (getValue1 v) s
 
 
 -- | Match a primitive value specification against a single value.

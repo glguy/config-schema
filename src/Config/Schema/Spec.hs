@@ -69,6 +69,8 @@ import           Data.Functor.Compose             (Compose(..), getCompose)
 import           Data.Functor.Alt                 (Alt(..))
 import           Data.List.NonEmpty               (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import           Data.Semigroup                   (Semigroup)
+import           Data.Semigroup.Foldable          (asum1, foldMap1)
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
 
@@ -222,18 +224,18 @@ instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (
 
 
 -- | Given an interpretation of a primitive value specification, extract a list of
--- the possible interpretations of a disjunction of value specifications.
---
--- Unlike 'runValueSpecs_', this allows the result of the interpretation to be indexed
--- by the type of the primitive value specifications.
-runValueSpecs :: Functor f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> NonEmpty (f a)
-runValueSpecs f = fmap (lowerCoyoneda . hoistCoyoneda f) . getCompose . unValueSpecs
+-- the possible interpretations of a disjunction of value specifications. Each of
+-- these primitive interpretations will be combined using the provided 'Alt' instance.
+runValueSpecs :: Alt f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> f a
+runValueSpecs f = asum1 . fmap (lowerCoyoneda . hoistCoyoneda f) . getCompose . unValueSpecs
 
 
 -- | Given an interpretation of a primitive value specification, extract a list of
--- the possible interpretations of a disjunction of value specifications.
-runValueSpecs_ :: (forall x. ValueSpec x -> m) -> ValueSpecs a -> NonEmpty m
-runValueSpecs_ f = fmap getConst . runValueSpecs (Const . f)
+-- the possible interpretations of a disjunction of value specifications. Each of
+-- these primitive interpretations will be combined using the provided 'Semigroup' instance.
+runValueSpecs_ :: Semigroup m => (forall x. ValueSpec x -> m) -> ValueSpecs a -> m
+runValueSpecs_ f = foldMap1 (getConst . lowerCoyoneda . hoistCoyoneda (Const . f))
+                 . getCompose . unValueSpecs
 
 
 -- | Lift a primitive value specification to 'ValueSpecs'.
