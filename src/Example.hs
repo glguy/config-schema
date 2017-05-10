@@ -26,8 +26,10 @@ exampleSpec :: ValueSpecs Text
 exampleSpec = sectionsSpec "" $
   do name  <- reqSection  "name" "Full name"
      age   <- reqSection  "age"  "Age of user"
-     happy <- optSection' "happy" "Current happiness status" yesOrNo
-     kids  <- reqSection' "kids"  "All children" (oneOrList kidSpec)
+     happy <- optSection' "happy" yesOrNo
+              "Current happiness status"
+     kids  <- reqSection' "kids"  (oneOrList kidSpec)
+              "All children's names"
 
      return $
        let happyText = case happy of Just True  -> " and is happy"
