@@ -57,7 +57,7 @@ generateDocs spec
   where
     topname = ""
     Just top = Map.lookup topname m
-    DocBuilder (m,"") = valuesDoc spec
+    (m,"") = runDocBuilder (valuesDoc spec)
     m' = Map.delete topname m
 
     sectionLines :: (Text, Doc) -> [Doc]
@@ -112,7 +112,7 @@ valueDoc w =
 
 -- | A writer-like type. A mapping of section names and documentation
 -- lines is accumulated.
-newtype DocBuilder a = DocBuilder (Map Text Doc, a)
+newtype DocBuilder a = DocBuilder { runDocBuilder :: (Map Text Doc, a) }
   deriving (Functor, Applicative, Monad, Monoid, Show)
 
 

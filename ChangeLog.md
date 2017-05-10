@@ -1,10 +1,11 @@
 # Revision history for config-schema
 
-## 0.3.0.0  --
+## 0.3.0.0  -- 2017-05-09
 
-* Added /association list/ specifications
+* Added "association list" specifications
 * Use `pretty` library for documentation generation
 * Reorder parameters so that documentation comes last
+* Hide implementations of `ValueSpecs` and `SectionSpecs`
 
 ## 0.2.0.0  -- 2017-05-07
 

@@ -1,5 +1,5 @@
 {-# Language FlexibleInstances, RankNTypes, GADTs, KindSignatures #-}
-{-# Language GeneralizedNewtypeDeriving, OverloadedStrings #-}
+{-# Language DeriveFunctor, GeneralizedNewtypeDeriving, OverloadedStrings #-}
 
 {-|
 Module      : Config.Schema.Spec
@@ -22,14 +22,14 @@ visit the "Client.Configuration" and "Client.Configuration.Colors" modules.
 module Config.Schema.Spec
   (
   -- * Specifying sections
-    SectionSpecs(..)
+    SectionSpecs
   , reqSection
   , optSection
   , reqSection'
   , optSection'
 
   -- * Specifying values
-  , ValueSpecs(..)
+  , ValueSpecs
   , Spec(..)
   , sectionsSpec
   , assocSpec
@@ -65,7 +65,6 @@ module Config.Schema.Spec
 import           Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
 import           Data.Functor.Const               (Const(..))
 import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, lowerCoyoneda, hoistCoyoneda)
-import           Data.Functor.Compose             (Compose(..), getCompose)
 import           Data.Functor.Alt                 (Alt(..))
 import           Data.List.NonEmpty               (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -216,8 +215,8 @@ data ValueSpec :: * -> * where
 -- for simple types.
 --
 -- Multiple specifications can be combined using this type's 'Alt' instance.
-newtype ValueSpecs a = MkValueSpecs { unValueSpecs :: Compose NonEmpty (Coyoneda ValueSpec) a }
-  deriving Functor
+newtype ValueSpecs a = MkValueSpecs { unValueSpecs :: NonEmpty (Coyoneda ValueSpec a) }
+  deriving (Functor)
 
 -- | Left-biased choice between two specifications
 instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (x <!> y)
@@ -227,14 +226,14 @@ instance Alt ValueSpecs where MkValueSpecs x <!> MkValueSpecs y = MkValueSpecs (
 -- the possible interpretations of a disjunction of value specifications. Each of
 -- these primitive interpretations will be combined using the provided 'Alt' instance.
 runValueSpecs :: Alt f => (forall x. ValueSpec x -> f x) -> ValueSpecs a -> f a
-runValueSpecs f = asum1 . fmap (runCoyoneda f) . getCompose . unValueSpecs
+runValueSpecs f = asum1 . fmap (runCoyoneda f) . unValueSpecs
 
 
 -- | Given an interpretation of a primitive value specification, extract a list of
 -- the possible interpretations of a disjunction of value specifications. Each of
 -- these primitive interpretations will be combined using the provided 'Semigroup' instance.
 runValueSpecs_ :: Semigroup m => (forall x. ValueSpec x -> m) -> ValueSpecs a -> m
-runValueSpecs_ f = foldMap1 (runCoyoneda_ f) . getCompose . unValueSpecs
+runValueSpecs_ f = foldMap1 (runCoyoneda_ f) . unValueSpecs
 
 
 -- Helper for transforming the underlying type @f@ to one supporting a 'Functor'
@@ -252,7 +251,7 @@ runCoyoneda_ f = getConst . runCoyoneda (Const . f)
 --
 -- @since 0.2.0.0
 liftValueSpec :: ValueSpec a -> ValueSpecs a
-liftValueSpec = MkValueSpecs . Compose . pure . liftCoyoneda
+liftValueSpec = MkValueSpecs . pure . liftCoyoneda
 
 
 ------------------------------------------------------------------------
