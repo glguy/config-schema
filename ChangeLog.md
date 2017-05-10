@@ -4,6 +4,7 @@
 
 * Added /association list/ specifications
 * Use `pretty` library for documentation generation
+* Reorder parameters so that documentation comes last
 
 ## 0.2.0.0  -- 2017-05-07
 

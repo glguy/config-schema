@@ -147,10 +147,10 @@ reqSection n i = liftSectionSpec (ReqSection n i valuesSpec)
 -- | Specification for a required section with an explicit value specification.
 reqSection' ::
   Text         {- ^ section name        -} ->
-  Text         {- ^ description         -} ->
   ValueSpecs a {- ^ value specification -} ->
+  Text         {- ^ description         -} ->
   SectionSpecs a
-reqSection' n i w = liftSectionSpec (ReqSection n i w)
+reqSection' n w i = liftSectionSpec (ReqSection n i w)
 
 
 -- | Specification for an optional section with an implicit value specification.
@@ -165,10 +165,10 @@ optSection n i = liftSectionSpec (OptSection n i valuesSpec)
 -- | Specification for an optional section with an explicit value specification.
 optSection' ::
   Text         {- ^ section name        -} ->
-  Text         {- ^ description         -} ->
   ValueSpecs a {- ^ value specification -} ->
+  Text         {- ^ description         -} ->
   SectionSpecs (Maybe a)
-optSection' n i w = liftSectionSpec (OptSection n i w)
+optSection' n w i = liftSectionSpec (OptSection n i w)
 
 
 ------------------------------------------------------------------------
