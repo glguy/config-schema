@@ -13,14 +13,13 @@ accepted by the loader.
 
 ```haskell
 {-# Language OverloadedStrings, ApplicativeDo #-}
-
 module Example where
 
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import           Data.Text (Text)
 import           Data.Monoid ((<>))
 import           Data.Functor.Alt ((<!>))
+import           Data.List.NonEmpty (NonEmpty)
 
 import           Config
 import           Config.Schema
@@ -34,15 +33,17 @@ exampleFile =
   \   * name: \"Bob\"         \n\
   \   * name: \"Tom\"         \n"
 
-exampleValue :: Value
+exampleValue :: Value Position
 Right exampleValue = parse exampleFile
 
 exampleSpec :: ValueSpecs Text
 exampleSpec = sectionsSpec "" $
   do name  <- reqSection  "name" "Full name"
      age   <- reqSection  "age"  "Age of user"
-     happy <- optSection' "happy" "Current happiness status" yesOrNo
-     kids  <- reqSection' "kids"  "All children" (oneOrList kidSpec)
+     happy <- optSection' "happy" yesOrNo
+              "Current happiness status"
+     kids  <- reqSection' "kids"  (oneOrList kidSpec)
+              "All children's names"
 
      return $
        let happyText = case happy of Just True  -> " and is happy"
@@ -65,7 +66,7 @@ yesOrNo = True  <$ atomSpec "yes" <!>
 
 
 printDoc :: IO ()
-printDoc = Text.putStr (generateDocs exampleSpec)
+printDoc = print (generateDocs exampleSpec)
 -- *Example> printDoc
 -- Configuration file fields:
 --     name: REQUIRED text
@@ -81,7 +82,7 @@ printDoc = Text.putStr (generateDocs exampleSpec)
 --     name: REQUIRED text
 --        Kid's name
 
-example :: Either [LoadError] Text
+example :: Either (NonEmpty LoadError) Text
 example = loadValue exampleSpec exampleValue
 -- *Example> exampleVal
 -- Right "Johny Appleseed is 99 years old and has kids Bob, Tom and is happy"
