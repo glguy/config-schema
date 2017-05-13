@@ -41,7 +41,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text as Text
-import           Text.PrettyPrint (Doc, text, ($+$), (<>), (<+>), nest, empty, hsep)
+import           Text.PrettyPrint (Doc, fsep, text, ($+$), (<>), (<+>), nest, empty, hsep)
 
 import           Config.Schema.Spec
 
@@ -79,7 +79,9 @@ sectionDoc s =
   where
     aux req name desc val =
       txt name <> ":" <+> req <+> val $+$
-      if Text.null desc then empty else nest 4 (txt desc)
+      if Text.null desc
+        then empty
+        else nest 4 (fsep (txt <$> Text.splitOn " " desc)) -- line wrap logic
 
 
 -- | Compute the documentation line for a particular value specification.
