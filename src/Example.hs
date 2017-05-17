@@ -54,7 +54,7 @@ yesOrNo = True  <$ atomSpec "yes" <!>
 printDoc :: IO ()
 printDoc = print (generateDocs exampleSpec)
 -- *Example> printDoc
--- Configuration file fields:
+-- Top-level configuration file fields:
 --     name: REQUIRED text
 --        Full name
 --     age: REQUIRED integer

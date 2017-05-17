@@ -1,5 +1,10 @@
 # Revision history for config-schema
 
+## 0.3.1.0  -- 2017-05-16
+
+* Allow `generateDocs` to work on any ValueSpec, rather than
+  top-level empty-named section specs.
+
 ## 0.3.0.0  -- 2017-05-09
 
 * Added "association list" specifications

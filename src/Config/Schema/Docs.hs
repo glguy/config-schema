@@ -24,7 +24,7 @@ configSpec = sectionsSpec ""
 
 generateDocs configSpec
 
--- Configuration file fields:
+-- Top-level configuration file fields:
 --     username: REQUIRED text
 --        Name used to login
 --     attempts: integer
@@ -37,6 +37,7 @@ module Config.Schema.Docs
   ) where
 
 import           Data.List (intersperse)
+import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
@@ -45,23 +46,32 @@ import           Text.PrettyPrint (Doc, fsep, text, ($+$), (<>), (<+>), nest, em
 
 import           Config.Schema.Spec
 
--- | Default documentation generator. This generator is specifically
--- for configuration specifications where the top-level specification
--- is named with the empty string (@""@).
+-- | Default documentation generator.
 generateDocs :: ValueSpecs a -> Doc
-generateDocs spec
-  = vcat'
-  $ txt "Configuration file fields:"
-  : nest 4 top
-  : concatMap sectionLines (Map.toList m')
+generateDocs spec = vcat' docLines
   where
-    topname = ""
-    Just top = Map.lookup topname m
-    (m,"") = runDocBuilder (valuesDoc spec)
-    m' = Map.delete topname m
-
     sectionLines :: (Text, Doc) -> [Doc]
     sectionLines (name, fields) = [text "", txt name, nest 4 fields]
+
+    (topMap, topDoc) = runDocBuilder (valuesDoc spec)
+
+    docLines =
+      case runValueSpecs_ (pure . SomeSpec) spec of
+        -- single, top-level sections spec
+        SomeSpec (SectionSpecs name _) :| []
+          | Just top <- Map.lookup name topMap ->
+              txt "Top-level configuration file fields:" :
+              nest 4 top :
+              concatMap sectionLines (Map.toList (Map.delete name topMap))
+
+        -- otherwise
+        _ -> txt "Top-level configuration file format:" :
+             nest 4 topDoc :
+             concatMap sectionLines (Map.toList topMap)
+
+
+-- | Forget the type of the value spec
+data SomeSpec where SomeSpec :: ValueSpec a -> SomeSpec
 
 
 -- | Compute the documentation for a list of sections, store the
