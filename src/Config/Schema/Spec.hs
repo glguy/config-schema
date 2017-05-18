@@ -62,8 +62,8 @@ module Config.Schema.Spec
 
   ) where
 
+import           Control.Applicative              (Const(..))
 import           Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
-import           Data.Functor.Const               (Const(..))
 import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, lowerCoyoneda, hoistCoyoneda)
 import           Data.Functor.Alt                 (Alt(..))
 import           Data.List.NonEmpty               (NonEmpty)
