@@ -1,5 +1,9 @@
 # Revision history for config-schema
 
+## 0.3.1.1  -- 2017-05-17
+
+* Add support for GHC 7.10.3
+
 ## 0.3.1.0  -- 2017-05-16
 
 * Allow `generateDocs` to work on any ValueSpec, rather than
