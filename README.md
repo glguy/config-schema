@@ -82,7 +82,7 @@ printDoc = print (generateDocs exampleSpec)
 --     name: REQUIRED text
 --        Kid's name
 
-example :: Either (NonEmpty LoadError) Text
+example :: Either (NonEmpty (LoadError Position)) Text
 example = loadValue exampleSpec exampleValue
 -- *Example> exampleVal
 -- Right "Johny Appleseed is 99 years old and has kids Bob, Tom and is happy"

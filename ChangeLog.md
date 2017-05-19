@@ -1,5 +1,12 @@
 # Revision history for config-schema
 
+## 0.4.0.0
+
+* Parameterize the Load module on a position type
+* Allow Docs module to process recursively defined
+  specifications as long as a named section breaks
+  the loop.
+
 ## 0.3.1.1  -- 2017-05-17
 
 * Add support for GHC 7.10.3

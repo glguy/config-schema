@@ -40,13 +40,13 @@ import           Config.Schema.Spec
 -- the interpretation of that value or the list of errors
 -- encountered.
 loadValue ::
-  ValueSpecs a                  {- ^ specification           -} ->
-  Value Position                {- ^ value                   -} ->
-  Either (NonEmpty LoadError) a {- ^ errors or decoded value -}
+  ValueSpecs a                      {- ^ specification           -} ->
+  Value p                           {- ^ value                   -} ->
+  Either (NonEmpty (LoadError p)) a {- ^ errors or decoded value -}
 loadValue spec val = runLoad (getValue spec val)
 
 
-getSection :: Position -> SectionSpec a -> StateT [Section Position] Load a
+getSection :: p -> SectionSpec a -> StateT [Section p] (Load p) a
 getSection pos (ReqSection k _ w) =
   do v <- StateT (lookupSection pos k)
      lift (scope k (getValue w v))
@@ -55,7 +55,7 @@ getSection pos (OptSection k _ w) =
      lift (traverse (scope k . getValue w) mb)
 
 
-getSections :: Position -> SectionSpecs a -> [Section Position] -> Load a
+getSections :: p -> SectionSpecs a -> [Section p] -> Load p a
 getSections pos spec xs =
   do (a,leftovers) <- runStateT (runSections (getSection pos) spec) xs
      case NonEmpty.nonEmpty leftovers of
@@ -63,12 +63,12 @@ getSections pos spec xs =
        Just ss -> asum1 (fmap (\s -> loadFail (sectionAnn s) (UnusedSection (sectionName s))) ss)
 
 
-getValue :: ValueSpecs a -> Value Position -> Load a
+getValue :: ValueSpecs a -> Value p -> Load p a
 getValue s v = runValueSpecs (getValue1 v) s
 
 
 -- | Match a primitive value specification against a single value.
-getValue1 :: Value Position -> ValueSpec a -> Load a
+getValue1 :: Value p -> ValueSpec a -> Load p a
 getValue1 (Text _ t)       TextSpec           = pure t
 getValue1 (Number _ _ n)   IntegerSpec        = pure n
 getValue1 (Floating _ a b) IntegerSpec | Just i <- floatingToInteger a b = pure i
@@ -94,14 +94,14 @@ getValue1 v AssocSpec{}        = loadFail (valueAnn v) (SpecMismatch "associatio
 
 -- | This operation processes all of the values in a list with the given
 -- value specification and updates the scope with a one-based list index.
-getList :: ValueSpecs a -> [Value Position] -> Load [a]
+getList :: ValueSpecs a -> [Value p] -> Load p [a]
 getList w = zipWithM (\i x -> scope (Text.pack (show i)) (getValue w x)) [1::Int ..]
 
 
 -- | This operation processes all of the values in a section list
 -- against the given specification and associates them with the
 -- section name.
-getAssoc :: ValueSpecs a -> [Section Position] -> Load [(Text,a)]
+getAssoc :: ValueSpecs a -> [Section p] -> Load p [(Text,a)]
 getAssoc w = traverse $ \(Section _ k v) -> (,) k <$> getValue w v
 
 
@@ -110,8 +110,8 @@ getAssoc w = traverse $ \(Section _ k v) -> (,) k <$> getValue w v
 getCustom ::
   Text                 {- ^ label         -} ->
   ValueSpecs (Maybe a) {- ^ specification -} ->
-  Value Position       {- ^ value         -} ->
-  Load a
+  Value p              {- ^ value         -} ->
+  Load p a
 getCustom l w v =
   do x <- getValue w v
      case x of
@@ -121,10 +121,10 @@ getCustom l w v =
 
 -- | Extract a section from a list of sections by name.
 lookupSection ::
-  Position                    {- ^ starting position of sections      -} ->
-  Text                        {- ^ section name                       -} ->
-  [Section p]                 {- ^ available sections                 -} ->
-  Load (Value p, [Section p]) {- ^ found value and remaining sections -}
+  p                             {- ^ starting position of sections      -} ->
+  Text                          {- ^ section name                       -} ->
+  [Section p]                   {- ^ available sections                 -} ->
+  Load p (Value p, [Section p]) {- ^ found value and remaining sections -}
 lookupSection pos key [] = loadFail pos (MissingSection key)
 lookupSection pos key (s@(Section _ k v):xs)
   | key == k  = pure (v, xs)
@@ -153,21 +153,21 @@ floatingToInteger x y
 -- | Type used to match values against specifiations. This type tracks
 -- the current nested fields (updated with scope) and can throw
 -- errors using loadFail.
-newtype Load a = MkLoad { unLoad :: ReaderT [Text] (Except (NonEmpty LoadError)) a }
+newtype Load p a = MkLoad { unLoad :: ReaderT [Text] (Except (NonEmpty (LoadError p))) a }
   deriving (Functor, Applicative, Monad)
 
-instance Alt Load where MkLoad x <!> MkLoad y = MkLoad (x <!> y)
+instance Alt (Load p) where MkLoad x <!> MkLoad y = MkLoad (x <!> y)
 
 -- | Type for errors that can be encountered while decoding a value according
 -- to a specification. The error includes a key path indicating where in
 -- the configuration file the error occurred.
-data LoadError = LoadError Position [Text] Problem -- ^ position, path, problem
+data LoadError p = LoadError p [Text] Problem -- ^ position, path, problem
   deriving (Read, Show)
 
 
 -- | Run the Load computation until it produces a result or terminates
 -- with a list of errors.
-runLoad :: Load a -> Either (NonEmpty LoadError) a
+runLoad :: Load p a -> Either (NonEmpty (LoadError p)) a
 runLoad = runExcept . flip runReaderT [] . unLoad
 
 
@@ -179,11 +179,11 @@ data Problem
   deriving (Eq, Ord, Read, Show)
 
 -- | Push a new key onto the stack of nested fields.
-scope :: Text -> Load a -> Load a
+scope :: Text -> Load p a -> Load p a
 scope key (MkLoad m) = MkLoad (local (key:) m)
 
 -- | Abort value specification matching with the given error.
-loadFail :: Position -> Problem -> Load a
+loadFail :: p -> Problem -> Load p a
 loadFail pos cause = MkLoad $
   do path <- ask
      lift (throwE (pure (LoadError pos (reverse path) cause)))
