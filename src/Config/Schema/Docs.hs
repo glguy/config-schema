@@ -44,10 +44,10 @@ import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Map (Map)
 import           Data.Monoid (Monoid(..))
 import qualified Data.Map as Map
-import           Data.Semigroup
+import qualified Data.Semigroup as S
 import           Data.Text (Text)
 import qualified Data.Text as Text
-import           Text.PrettyPrint (Doc, fsep, text, ($+$), (<+>), nest, empty, hsep)
+import           Text.PrettyPrint (Doc, fsep, text, (<>), ($+$), (<+>), nest, empty, hsep)
 
 import           Config.Schema.Spec
 
@@ -135,14 +135,14 @@ newtype DocBuilder a = DocBuilder (State (Map Text Doc) a)
 runDocBuilder :: DocBuilder a -> (a, Map Text Doc)
 runDocBuilder (DocBuilder b) = runState b mempty
 
--- | lifts underlying Semigroup instance
-instance Semigroup a => Semigroup (DocBuilder a) where
-  (<>) = liftA2 (<>)
+-- | lifts underlying 'S.Semigroup' instance
+instance S.Semigroup a => S.Semigroup (DocBuilder a) where
+  (<>) = liftA2 (S.<>)
 
--- | lifts underlying Monoid instance
-instance (Semigroup a, Monoid a) => Monoid (DocBuilder a) where
+-- | lifts underlying 'Monoid' instance
+instance (S.Semigroup a, Monoid a) => Monoid (DocBuilder a) where
   mempty  = pure mempty
-  mappend = (<>)
+  mappend = (S.<>)
 
 
 -- | Given a section name and section body, store the body
