@@ -3,6 +3,14 @@ config-schema
 
 [![Hackage](https://img.shields.io/hackage/v/config-schema.svg)](https://hackage.haskell.org/package/config-schema) [![Build Status](https://secure.travis-ci.org/glguy/config-schema.png?branch=master)](http://travis-ci.org/glguy/config-schema)
 
+Live Demo
+--------
+
+The config-value and config-schema packages are available in a [live demo](https://glguy.net/config-demo/).
+
+About
+--------
+
 This package allows the user to define configuration schemas suitable for
 matching against configuration files written in the
 [config-value](https://hackage.haskell.org/package/config-value) format.
