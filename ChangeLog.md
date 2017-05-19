@@ -6,6 +6,7 @@
 * Allow Docs module to process recursively defined
   specifications as long as a named section breaks
   the loop.
+* Add parentheses to docs when needed
 
 ## 0.3.1.1  -- 2017-05-17
 

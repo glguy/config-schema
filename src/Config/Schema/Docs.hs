@@ -47,7 +47,8 @@ import qualified Data.Map as Map
 import qualified Data.Semigroup as S
 import           Data.Text (Text)
 import qualified Data.Text as Text
-import           Text.PrettyPrint (Doc, fsep, text, (<>), ($+$), (<+>), nest, empty, hsep)
+import           Text.PrettyPrint
+                    (Doc, fsep, text, (<>), ($+$), (<+>), nest, empty, hsep, parens)
 
 import           Config.Schema.Spec
 
@@ -58,7 +59,7 @@ generateDocs spec = vcat' docLines
     sectionLines :: (Text, Doc) -> [Doc]
     sectionLines (name, fields) = [text "", txt name, nest 4 fields]
 
-    (topDoc, topMap) = runDocBuilder (valuesDoc spec)
+    (topDoc, topMap) = runDocBuilder (valuesDoc False spec)
 
     docLines =
       case runValueSpecs_ (pure . SomeSpec) spec of
@@ -89,8 +90,8 @@ sectionsDoc l spec = emitDoc l (vcat' <$> runSections_ (fmap pure . sectionDoc) 
 sectionDoc :: SectionSpec a -> DocBuilder Doc
 sectionDoc s =
   case s of
-    ReqSection name desc w -> aux "REQUIRED" name desc <$> valuesDoc w
-    OptSection name desc w -> aux empty      name desc <$> valuesDoc w
+    ReqSection name desc w -> aux "REQUIRED" name desc <$> valuesDoc False w
+    OptSection name desc w -> aux empty      name desc <$> valuesDoc False w
   where
     aux req name desc val =
       (txt name <> ":") <+> req <+> val $+$
@@ -102,13 +103,20 @@ sectionDoc s =
 -- | Compute the documentation line for a particular value specification.
 -- Any sections contained in the specification will be stored in the
 -- sections map.
-valuesDoc :: ValueSpecs a -> DocBuilder Doc
-valuesDoc = fmap disjunction . sequenceA . runValueSpecs_ (fmap pure valueDoc)
+--
+-- Set nested to 'True' when using valuesDoc in a nested context and
+-- parentheses would be needed in the case of multiple alternatives.
+valuesDoc :: Bool {- ^ nested -} -> ValueSpecs a -> DocBuilder Doc
+valuesDoc nested =
+  fmap (disjunction nested) . sequenceA . runValueSpecs_ (fmap pure valueDoc)
 
 
 -- | Combine a list of text with the word @or@.
-disjunction :: [Doc] -> Doc
-disjunction = hsep . intersperse "or"
+disjunction :: Bool {- ^ nested -} -> [Doc] -> Doc
+disjunction _ [x]    = x
+disjunction True  xs = parens (hsep (intersperse "or" xs))
+disjunction False xs =         hsep (intersperse "or" xs)
+
 
 
 -- | Compute the documentation fragment for an individual value specification.
@@ -121,10 +129,10 @@ valueDoc w =
     AtomSpec a       -> pure ("`" <> txt a <> "`")
     AnyAtomSpec      -> pure "atom"
     SectionSpecs l s -> sectionsDoc l s
-    NamedSpec    l s -> emitDoc l (valuesDoc s)
-    CustomSpec l w'  -> (txt l                 <+>) <$> valuesDoc w'
-    ListSpec ws      -> ("list of"             <+>) <$> valuesDoc ws
-    AssocSpec ws     -> ("association list of" <+>) <$> valuesDoc ws
+    NamedSpec    l s -> emitDoc l (valuesDoc False s)
+    CustomSpec l w'  -> (txt l                 <+>) <$> valuesDoc True w'
+    ListSpec ws      -> ("list of"             <+>) <$> valuesDoc True ws
+    AssocSpec ws     -> ("association list of" <+>) <$> valuesDoc True ws
 
 
 -- | A writer-like type. A mapping of section names and documentation
@@ -148,9 +156,9 @@ instance (S.Semigroup a, Monoid a) => Monoid (DocBuilder a) where
 -- | Given a section name and section body, store the body
 -- in the map of sections and return the section name.
 emitDoc ::
-  Text           {- ^ section name -} ->
-  DocBuilder Doc {- ^ section body -} ->
-  DocBuilder Doc
+  Text           {- ^ section name     -} ->
+  DocBuilder Doc {- ^ section body     -} ->
+  DocBuilder Doc {- ^ section name doc -}
 emitDoc l (DocBuilder sub) = DocBuilder $
   do m <- get
      unless (Map.member l m) $
