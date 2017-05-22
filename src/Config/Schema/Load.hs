@@ -102,7 +102,7 @@ getList w = zipWithM (\i x -> scope (Text.pack (show i)) (getValue w x)) [1::Int
 -- against the given specification and associates them with the
 -- section name.
 getAssoc :: ValueSpecs a -> [Section p] -> Load p [(Text,a)]
-getAssoc w = traverse $ \(Section _ k v) -> (,) k <$> getValue w v
+getAssoc w = traverse $ \(Section _ k v) -> (,) k <$> scope k (getValue w v)
 
 
 -- | Match a value against its specification. If 'Just' is matched
