@@ -271,16 +271,16 @@ instance Spec a => Spec [a] where valuesSpec = liftValueSpec (ListSpec valuesSpe
 instance (Spec a, Spec b) => Spec (Either a b) where
   valuesSpec = Left <$> valuesSpec <!> Right <$> valuesSpec
 
-instance Spec Int    where valuesSpec = sizedBitsSpec "int"
-instance Spec Int8   where valuesSpec = sizedBitsSpec "int8"
-instance Spec Int16  where valuesSpec = sizedBitsSpec "int16"
-instance Spec Int32  where valuesSpec = sizedBitsSpec "int32"
-instance Spec Int64  where valuesSpec = sizedBitsSpec "int64"
-instance Spec Word   where valuesSpec = sizedBitsSpec "word"
-instance Spec Word8  where valuesSpec = sizedBitsSpec "word8"
-instance Spec Word16 where valuesSpec = sizedBitsSpec "word16"
-instance Spec Word32 where valuesSpec = sizedBitsSpec "word32"
-instance Spec Word64 where valuesSpec = sizedBitsSpec "word64"
+instance Spec Int    where valuesSpec = sizedBitsSpec "machine-bit signed"
+instance Spec Int8   where valuesSpec = sizedBitsSpec "8-bit signed"
+instance Spec Int16  where valuesSpec = sizedBitsSpec "16-bit signed"
+instance Spec Int32  where valuesSpec = sizedBitsSpec "32-bit signed"
+instance Spec Int64  where valuesSpec = sizedBitsSpec "64-bit signed"
+instance Spec Word   where valuesSpec = sizedBitsSpec "machine-bit unsigned"
+instance Spec Word8  where valuesSpec = sizedBitsSpec "8-bit unsigned"
+instance Spec Word16 where valuesSpec = sizedBitsSpec "16-bit unsigned"
+instance Spec Word32 where valuesSpec = sizedBitsSpec "32-bit unsigned"
+instance Spec Word64 where valuesSpec = sizedBitsSpec "64-bit unsigned"
 
 sizedBitsSpec :: (Integral a, Bits a) => Text -> ValueSpecs a
 sizedBitsSpec name = customSpec name (liftValueSpec IntegerSpec) toIntegralSized
