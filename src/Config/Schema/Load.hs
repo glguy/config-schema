@@ -55,10 +55,10 @@ loadValue spec val = runLoad (getValue spec val)
 --
 -- Throws 'IOError', 'ParseError', or 'SchemaError'
 loadValueFromFile ::
-  FilePath     {- ^ filename      -} ->
   ValueSpecs a {- ^ specification -} ->
+  FilePath     {- ^ filename      -} ->
   IO a
-loadValueFromFile path spec =
+loadValueFromFile spec path =
   do txt <- Text.readFile path
      val <- either throwIO return (parse txt)
      either (throwIO . SchemaError) return (loadValue spec val)
