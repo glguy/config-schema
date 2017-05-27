@@ -53,7 +53,7 @@ loadValue spec val = runLoad (getValue spec val)
 -- | Read a configuration file, parse it, and validate it according
 -- to the given specification.
 --
--- Throws 'IOError', 'ParseError', or @'NonEmpty' ('LoadError' 'Position')@
+-- Throws 'IOError', 'ParseError', or 'SchemaError'
 loadValueFromFile ::
   FilePath     {- ^ filename      -} ->
   ValueSpecs a {- ^ specification -} ->
