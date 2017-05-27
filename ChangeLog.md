@@ -1,5 +1,11 @@
 # Revision history for config-schema
 
+## 0.4.1.0
+
+* Add `loadValueFromFile` and `SchemaError`. This is intended
+  as a quick way to get a configuration file loaded with all
+  errors being thrown as exceptions.
+
 ## 0.4.0.0
 
 * Parameterize the Load module on a position type

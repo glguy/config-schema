@@ -12,12 +12,15 @@ value according to a specification as built using "Config.Schema.Spec".
 -}
 module Config.Schema.Load
   ( loadValue
+  , loadValueFromFile
 
   -- * Errors
+  , SchemaError(..)
   , LoadError(..)
   , Problem(..)
   ) where
 
+import           Control.Exception                (Exception(..), throwIO)
 import           Control.Monad                    (zipWithM)
 import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.State        (StateT(..), runStateT)
@@ -31,6 +34,7 @@ import           Data.List.NonEmpty               (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 
 import           Config
 import           Config.Schema.Spec
@@ -44,6 +48,47 @@ loadValue ::
   Value p                           {- ^ value                   -} ->
   Either (NonEmpty (LoadError p)) a {- ^ errors or decoded value -}
 loadValue spec val = runLoad (getValue spec val)
+
+
+-- | Read a configuration file, parse it, and validate it according
+-- to the given specification.
+--
+-- Throws 'IOError', 'ParseError', or @'NonEmpty' ('LoadError' 'Position')@
+loadValueFromFile ::
+  FilePath     {- ^ filename      -} ->
+  ValueSpecs a {- ^ specification -} ->
+  IO a
+loadValueFromFile path spec =
+  do txt <- Text.readFile path
+     val <- either throwIO return (parse txt)
+     either (throwIO . SchemaError) return (loadValue spec val)
+
+
+-- | Newtype wrapper for schema load errors.
+newtype SchemaError = SchemaError (NonEmpty (LoadError Position))
+  deriving Show
+
+-- | Custom 'displayException' implementation
+instance Exception SchemaError where
+  displayException (SchemaError e) = foldr showLoadError "" e
+    where
+      showLoadError (LoadError pos path problem)
+        = shows (posLine pos)
+        . showChar ':'
+        . shows (posColumn pos)
+        . showString ": "
+        . foldr (\x xs -> showString (Text.unpack x) . showChar ':' . xs) id path
+        . showChar ' '
+        . showProblem problem
+        . showChar '\n'
+
+      showProblem p =
+        case p of
+          MissingSection x -> showString "missing required section `"
+                            . showString (Text.unpack x) . showChar '`'
+          UnusedSection  x -> showString "unused section `"
+                            . showString (Text.unpack x) . showChar '`'
+          SpecMismatch   x -> showString "expected " . showString (Text.unpack x)
 
 
 getSection :: p -> SectionSpec a -> StateT [Section p] (Load p) a
