@@ -1,5 +1,10 @@
 # Revision history for config-schema
 
+## 0.4.2.0
+
+* Add Spec instances for Int and Word types. All instances
+  including the previous Int instance now validate ranges.
+
 ## 0.4.1.0
 
 * Add `loadValueFromFile` and `SchemaError`. This is intended

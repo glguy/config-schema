@@ -64,14 +64,17 @@ module Config.Schema.Spec
 
 import           Control.Applicative              (Const(..))
 import           Control.Applicative.Free         (Ap, runAp, runAp_, liftAp)
+import           Data.Bits                        (Bits, toIntegralSized)
 import           Data.Functor.Coyoneda            (Coyoneda(..), liftCoyoneda, lowerCoyoneda, hoistCoyoneda)
 import           Data.Functor.Alt                 (Alt(..))
+import           Data.Int
 import           Data.List.NonEmpty               (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Semigroup                   (Semigroup)
 import           Data.Semigroup.Foldable          (asum1, foldMap1)
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
+import           Data.Word
 
 ------------------------------------------------------------------------
 -- Specifications for sections
@@ -264,11 +267,23 @@ class    Spec a       where valuesSpec :: ValueSpecs a
 instance Spec Text    where valuesSpec = liftValueSpec TextSpec
 instance Spec Integer where valuesSpec = liftValueSpec IntegerSpec
 instance Spec Rational where valuesSpec = liftValueSpec RationalSpec
-instance Spec Int     where valuesSpec = fromInteger <$> valuesSpec
 instance Spec a => Spec [a] where valuesSpec = liftValueSpec (ListSpec valuesSpec)
 instance (Spec a, Spec b) => Spec (Either a b) where
   valuesSpec = Left <$> valuesSpec <!> Right <$> valuesSpec
 
+instance Spec Int    where valuesSpec = sizedBitsSpec "int"
+instance Spec Int8   where valuesSpec = sizedBitsSpec "int8"
+instance Spec Int16  where valuesSpec = sizedBitsSpec "int16"
+instance Spec Int32  where valuesSpec = sizedBitsSpec "int32"
+instance Spec Int64  where valuesSpec = sizedBitsSpec "int64"
+instance Spec Word   where valuesSpec = sizedBitsSpec "word"
+instance Spec Word8  where valuesSpec = sizedBitsSpec "word8"
+instance Spec Word16 where valuesSpec = sizedBitsSpec "word16"
+instance Spec Word32 where valuesSpec = sizedBitsSpec "word32"
+instance Spec Word64 where valuesSpec = sizedBitsSpec "word64"
+
+sizedBitsSpec :: (Integral a, Bits a) => Text -> ValueSpecs a
+sizedBitsSpec name = customSpec name (liftValueSpec IntegerSpec) toIntegralSized
 
 -- | Specification for matching a particular atom.
 atomSpec :: Text -> ValueSpecs ()
