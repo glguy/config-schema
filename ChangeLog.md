@@ -1,5 +1,8 @@
 # Revision history for config-schema
 
+## 0.5.0.1
+* Support GHC 8.4.1
+
 ## 0.5.0.0
 
 * Add Spec instances for Int and Word types. All instances

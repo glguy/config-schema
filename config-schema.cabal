@@ -1,5 +1,5 @@
 name:                config-schema
-version:             0.5.0.0
+version:             0.5.0.1
 synopsis:            Schema definitions for the config-value package
 description:         This package makes it possible to defined schemas for use when
                      loading configuration files using the config-value format.
@@ -25,7 +25,7 @@ source-repository head
 
 library
   exposed-modules:      Config.Schema, Config.Schema.Docs, Config.Schema.Load, Config.Schema.Spec
-  build-depends:        base           >=4.8   && <4.11,
+  build-depends:        base           >=4.8   && <4.12,
                         config-value   >=0.6   && <0.7,
                         containers     >=0.5   && <0.6,
                         free           >=4.12  && <5.1,

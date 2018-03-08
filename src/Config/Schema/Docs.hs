@@ -49,6 +49,7 @@ import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Text.PrettyPrint
                     (Doc, fsep, text, (<>), ($+$), (<+>), nest, empty, hsep, parens)
+import           Prelude hiding ((<>))
 
 import           Config.Schema.Spec
 
