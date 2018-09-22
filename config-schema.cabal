@@ -25,7 +25,7 @@ source-repository head
 
 library
   exposed-modules:      Config.Schema, Config.Schema.Docs, Config.Schema.Load, Config.Schema.Spec
-  build-depends:        base           >=4.8   && <4.12,
+  build-depends:        base           >=4.8   && <4.13,
                         config-value   >=0.6   && <0.7,
                         containers     >=0.5   && <0.7,
                         free           >=4.12  && <5.2,
