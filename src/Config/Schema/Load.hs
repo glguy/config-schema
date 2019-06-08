@@ -41,7 +41,7 @@ import           Config.Schema.Spec
 import           Config.Schema.Types
 
 
--- | Match a 'Value' against a 'ValueSpecs' and return either
+-- | Match a 'Value' against a 'ValueSpec' and return either
 -- the interpretation of that value or the list of errors
 -- encountered.
 loadValue ::
@@ -217,7 +217,7 @@ runLoad :: Load p a -> Either (NonEmpty (LoadError p)) a
 runLoad = runExcept . flip runReaderT [] . unLoad
 
 
--- | Problems that can be encountered when matching a 'Value' against a 'ValueSpecs'.
+-- | Problems that can be encountered when matching a 'Value' against a 'ValueSpec'.
 data Problem
   = MissingSection Text -- ^ missing section name
   | UnusedSection Text  -- ^ unused section names

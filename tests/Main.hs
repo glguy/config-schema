@@ -23,9 +23,9 @@ import qualified Data.Text as Text
 test ::
   Show a =>
   Eq   a =>
-  ValueSpecs a {- ^ specification to match -} ->
-  a            {- ^ expected output        -} ->
-  [[Text]]     {- ^ inputs sources         -} ->
+  ValueSpec a {- ^ specification to match -} ->
+  a           {- ^ expected output        -} ->
+  [[Text]]    {- ^ inputs sources         -} ->
   IO ()
 test spec expected txtss =
   for_ txtss $ \txts ->
@@ -41,18 +41,18 @@ test spec expected txtss =
 main :: IO ()
 main = sequenceA_
 
-  [ test valuesSpec ("Hello world"::Text)
+  [ test anySpec ("Hello world"::Text)
     [["\"Hello world\""]
     ,["\"H\\101l\\&l\\o157 \\"
      ,"  \\w\\x6frld\""]
     ]
 
-  , test valuesSpec (1234::Integer)
+  , test anySpec (1234::Integer)
     [["1234"]
     ,["1234.0"]
     ]
 
-  , test valuesSpec (0.65::Rational)
+  , test anySpec (0.65::Rational)
     [["0.65e0"]
     ,["65e-2"]
     ,["6.5e-1"]
@@ -65,7 +65,7 @@ main = sequenceA_
   , test (atomSpec "testing-1-2-3") ()
     [["testing-1-2-3"]]
 
-  , test (listSpec valuesSpec) ([]::[Integer])
+  , test (listSpec anySpec) ([]::[Integer])
     [["[]"]
     ,["[ ]"]]
 
@@ -75,7 +75,7 @@ main = sequenceA_
     ,["* ḿyatoḿ"]
     ]
 
-  , test valuesSpec [1,2,3::Int]
+  , test anySpec [1,2,3::Int]
     [["[1,2,3]"]
     ,["[1,2,3,]"]
     ,["* 1"
@@ -83,7 +83,7 @@ main = sequenceA_
      ,"* 3"]
     ]
 
-  , test (listSpec valuesSpec) [[1,2],[3,4::Int]]
+  , test (listSpec anySpec) [[1,2],[3,4::Int]]
     [["[[1,2,],[3,4]]"]
     ,["*[1,2]"
      ,"*[3,4]"]
@@ -94,19 +94,19 @@ main = sequenceA_
      ]
     ]
 
-  , test (assocSpec valuesSpec) ([]::[(Text,Int)])
+  , test (assocSpec anySpec) ([]::[(Text,Int)])
     [["{}"]
     ,["{ }"]
     ]
 
-  , test (assocSpec valuesSpec) [("k1",10::Int), ("k2",20)]
+  , test (assocSpec anySpec) [("k1",10::Int), ("k2",20)]
     [["{k1: 10, k2: 20}"]
     ,["{k1: 10, k2: 20,}"]
     ,["k1 : 10"
      ,"k2: 20"]
     ]
 
-  , test valuesSpec [ Left (1::Int), Right ("two"::Text) ]
+  , test anySpec [ Left (1::Int), Right ("two"::Text) ]
     [["[1, \"two\"]"]
     ,["* 1"
      ,"* \"two\""]

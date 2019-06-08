@@ -11,6 +11,11 @@ This module defines the syntax of value specifications.
 Specifications can be defined using "Config.Schema.Spec" and can be consumed
 with "Config.Schema.Load" and "Config.Schema.Doc".
 
+This module defines high-level 'ValueSpec' and 'SectionsSpec' types that are
+intended to be used by normal library users. This types are implemented in
+terms of primitive 'PrimValueSpec' and 'PrimSectionSpec' types. These
+primitives are what consumers of specifications will need to use.
+
 -}
 module Config.Schema.Types
   (
@@ -66,7 +71,7 @@ data PrimValueSpec :: * -> * where
   -- | Documentation identifier and sections specification
   SectionsSpec :: Text -> SectionsSpec a -> PrimValueSpec a
 
-  -- | Matches an arbitrary list of sections. Similar to 'SectionSpec'
+  -- | Matches an arbitrary list of sections. Similar to 'SectionsSpec'
   -- except that that the section names are user-defined.
   AssocSpec :: ValueSpec a -> PrimValueSpec [(Text,a)]
 
@@ -80,8 +85,7 @@ data PrimValueSpec :: * -> * where
   NamedSpec :: Text -> ValueSpec a -> PrimValueSpec a
 
 -- | Non-empty disjunction of value specifications. This type is the primary
--- way to specify expected values. Use the 'Spec' class to generate 'ValueSpec'
--- for simple types.
+-- way to specify expected values.
 --
 -- Multiple specifications can be combined using this type's 'Alt' instance.
 newtype ValueSpec a = MkValueSpec
