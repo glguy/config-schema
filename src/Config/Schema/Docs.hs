@@ -16,7 +16,7 @@ particular configuration specification. All of the defintions would would need
 to be able to generate another form are exported by "Config.Schema.Spec".
 
 @
-configSpec :: ValueSpecs (Text,Maybe Int)
+configSpec :: ValueSpec (Text,Maybe Int)
 configSpec = sectionsSpec ""
            $ liftA2 (,)
                (reqSection "username" "Name used to login")
@@ -52,9 +52,10 @@ import           Text.PrettyPrint
 import           Prelude hiding ((<>))
 
 import           Config.Schema.Spec
+import           Config.Schema.Types
 
 -- | Default documentation generator.
-generateDocs :: ValueSpecs a -> Doc
+generateDocs :: ValueSpec a -> Doc
 generateDocs spec = vcat' docLines
   where
     sectionLines :: (Text, Doc) -> [Doc]
@@ -63,9 +64,9 @@ generateDocs spec = vcat' docLines
     (topDoc, topMap) = runDocBuilder (valuesDoc False spec)
 
     docLines =
-      case runValueSpecs_ (pure . SomeSpec) spec of
+      case runValueSpec_ (pure . SomeSpec) spec of
         -- single, top-level sections spec
-        SomeSpec (SectionSpecs name _) :| []
+        SomeSpec (SectionsSpec name _) :| []
           | Just top <- Map.lookup name topMap ->
               txt "Top-level configuration file fields:" :
               nest 4 top :
@@ -78,17 +79,17 @@ generateDocs spec = vcat' docLines
 
 
 -- | Forget the type of the value spec
-data SomeSpec where SomeSpec :: ValueSpec a -> SomeSpec
+data SomeSpec where SomeSpec :: PrimValueSpec a -> SomeSpec
 
 
 -- | Compute the documentation for a list of sections, store the
 -- documentation in the sections map and return the name of the section.
-sectionsDoc :: Text -> SectionSpecs a -> DocBuilder Doc
+sectionsDoc :: Text -> SectionsSpec a -> DocBuilder Doc
 sectionsDoc l spec = emitDoc l (vcat' <$> runSections_ (fmap pure . sectionDoc) spec)
 
 
 -- | Compute the documentation lines for a single key-value pair.
-sectionDoc :: SectionSpec a -> DocBuilder Doc
+sectionDoc :: PrimSectionSpec a -> DocBuilder Doc
 sectionDoc s =
   case s of
     ReqSection name desc w -> aux "REQUIRED" name desc <$> valuesDoc False w
@@ -107,9 +108,9 @@ sectionDoc s =
 --
 -- Set nested to 'True' when using valuesDoc in a nested context and
 -- parentheses would be needed in the case of multiple alternatives.
-valuesDoc :: Bool {- ^ nested -} -> ValueSpecs a -> DocBuilder Doc
+valuesDoc :: Bool {- ^ nested -} -> ValueSpec a -> DocBuilder Doc
 valuesDoc nested =
-  fmap (disjunction nested) . sequenceA . runValueSpecs_ (fmap pure valueDoc)
+  fmap (disjunction nested) . sequenceA . runValueSpec_ (fmap pure valueDoc)
 
 
 -- | Combine a list of text with the word @or@.
@@ -121,7 +122,7 @@ disjunction False xs =         hsep (intersperse "or" xs)
 
 
 -- | Compute the documentation fragment for an individual value specification.
-valueDoc :: ValueSpec a -> DocBuilder Doc
+valueDoc :: PrimValueSpec a -> DocBuilder Doc
 valueDoc w =
   case w of
     TextSpec         -> pure "text"
@@ -129,7 +130,7 @@ valueDoc w =
     RationalSpec     -> pure "number"
     AtomSpec a       -> pure ("`" <> txt a <> "`")
     AnyAtomSpec      -> pure "atom"
-    SectionSpecs l s -> sectionsDoc l s
+    SectionsSpec l s -> sectionsDoc l s
     NamedSpec    l s -> emitDoc l (valuesDoc False s)
     CustomSpec l w'  -> (txt l                 <+>) <$> valuesDoc True w'
     ListSpec ws      -> ("list of"             <+>) <$> valuesDoc True ws

@@ -38,13 +38,14 @@ import qualified Data.Text.IO as Text
 
 import           Config
 import           Config.Schema.Spec
+import           Config.Schema.Types
 
 
 -- | Match a 'Value' against a 'ValueSpecs' and return either
 -- the interpretation of that value or the list of errors
 -- encountered.
 loadValue ::
-  ValueSpecs a                      {- ^ specification           -} ->
+  ValueSpec a                       {- ^ specification           -} ->
   Value p                           {- ^ value                   -} ->
   Either (NonEmpty (LoadError p)) a {- ^ errors or decoded value -}
 loadValue spec val = runLoad (getValue spec val)
@@ -55,8 +56,8 @@ loadValue spec val = runLoad (getValue spec val)
 --
 -- Throws 'IOError', 'ParseError', or 'SchemaError'
 loadValueFromFile ::
-  ValueSpecs a {- ^ specification -} ->
-  FilePath     {- ^ filename      -} ->
+  ValueSpec a {- ^ specification -} ->
+  FilePath    {- ^ filename      -} ->
   IO a
 loadValueFromFile spec path =
   do txt <- Text.readFile path
@@ -91,7 +92,7 @@ instance Exception SchemaError where
           SpecMismatch   x -> showString "expected " . showString (Text.unpack x)
 
 
-getSection :: p -> SectionSpec a -> StateT [Section p] (Load p) a
+getSection :: p -> PrimSectionSpec a -> StateT [Section p] (Load p) a
 getSection pos (ReqSection k _ w) =
   do v <- StateT (lookupSection pos k)
      lift (scope k (getValue w v))
@@ -100,7 +101,7 @@ getSection pos (OptSection k _ w) =
      lift (traverse (scope k . getValue w) mb)
 
 
-getSections :: p -> SectionSpecs a -> [Section p] -> Load p a
+getSections :: p -> SectionsSpec a -> [Section p] -> Load p a
 getSections pos spec xs =
   do (a,leftovers) <- runStateT (runSections (getSection pos) spec) xs
      case NonEmpty.nonEmpty leftovers of
@@ -108,12 +109,12 @@ getSections pos spec xs =
        Just ss -> asum1 (fmap (\s -> loadFail (sectionAnn s) (UnusedSection (sectionName s))) ss)
 
 
-getValue :: ValueSpecs a -> Value p -> Load p a
-getValue s v = runValueSpecs (getValue1 v) s
+getValue :: ValueSpec a -> Value p -> Load p a
+getValue s v = runValueSpec (getValue1 v) s
 
 
 -- | Match a primitive value specification against a single value.
-getValue1 :: Value p -> ValueSpec a -> Load p a
+getValue1 :: Value p -> PrimValueSpec a -> Load p a
 getValue1 (Text _ t)       TextSpec           = pure t
 getValue1 (Number _ _ n)   IntegerSpec        = pure n
 getValue1 (Floating _ a b) IntegerSpec | Just i <- floatingToInteger a b = pure i
@@ -122,7 +123,7 @@ getValue1 (Floating _ a b) RationalSpec       = pure (floatingToRational a b)
 getValue1 (List _ xs)      (ListSpec w)       = getList w xs
 getValue1 (Atom _ b)       AnyAtomSpec        = pure (atomName b)
 getValue1 (Atom _ b)       (AtomSpec a) | a == atomName b = pure ()
-getValue1 (Sections p s)   (SectionSpecs _ w) = getSections p w s
+getValue1 (Sections p s)   (SectionsSpec _ w) = getSections p w s
 getValue1 (Sections _ s)   (AssocSpec w)      = getAssoc w s
 getValue1 v                (NamedSpec _ w)    = getValue w v
 getValue1 v                (CustomSpec l w)   = getCustom l w v
@@ -133,29 +134,29 @@ getValue1 v RationalSpec       = loadFail (valueAnn v) (SpecMismatch "number")
 getValue1 v ListSpec{}         = loadFail (valueAnn v) (SpecMismatch "list")
 getValue1 v AnyAtomSpec        = loadFail (valueAnn v) (SpecMismatch "atom")
 getValue1 v (AtomSpec a)       = loadFail (valueAnn v) (SpecMismatch ("`" <> a <> "`"))
-getValue1 v (SectionSpecs l _) = loadFail (valueAnn v) (SpecMismatch l)
+getValue1 v (SectionsSpec l _) = loadFail (valueAnn v) (SpecMismatch l)
 getValue1 v AssocSpec{}        = loadFail (valueAnn v) (SpecMismatch "association list")
 
 
 -- | This operation processes all of the values in a list with the given
 -- value specification and updates the scope with a one-based list index.
-getList :: ValueSpecs a -> [Value p] -> Load p [a]
+getList :: ValueSpec a -> [Value p] -> Load p [a]
 getList w = zipWithM (\i x -> scope (Text.pack (show i)) (getValue w x)) [1::Int ..]
 
 
 -- | This operation processes all of the values in a section list
 -- against the given specification and associates them with the
 -- section name.
-getAssoc :: ValueSpecs a -> [Section p] -> Load p [(Text,a)]
+getAssoc :: ValueSpec a -> [Section p] -> Load p [(Text,a)]
 getAssoc w = traverse $ \(Section _ k v) -> (,) k <$> scope k (getValue w v)
 
 
 -- | Match a value against its specification. If 'Just' is matched
 -- return the value. If 'Nothing is matched, report an error.
 getCustom ::
-  Text                 {- ^ label         -} ->
-  ValueSpecs (Maybe a) {- ^ specification -} ->
-  Value p              {- ^ value         -} ->
+  Text                {- ^ label         -} ->
+  ValueSpec (Maybe a) {- ^ specification -} ->
+  Value p             {- ^ value         -} ->
   Load p a
 getCustom l w v =
   do x <- getValue w v
