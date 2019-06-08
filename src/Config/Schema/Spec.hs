@@ -22,6 +22,7 @@ visit the "Client.Configuration" and "Client.Configuration.Colors" modules.
 module Config.Schema.Spec
   (
   -- * Specifying values
+  -- $values
     ValueSpec
   , sectionsSpec
   , assocSpec
@@ -65,6 +66,79 @@ import           Config.Schema.Types
 ------------------------------------------------------------------------
 -- 'ValueSpec' builders
 ------------------------------------------------------------------------
+
+-- $values
+--
+-- 'ValueSpec' allows you to define specifications that will match
+-- parsed config-value configuration files. 'ValueSpec' allows
+-- us to define the shape of configuration values that will match
+-- the specification as well as a way to process those matches.
+--
+-- Below we have an example configuration record that can be matched
+-- from a configuration file.
+--
+-- More documentation for defining key-value pairs is available below.
+--
+-- This configuration file expects either a given username or allows
+-- the user to ask for a random username. The ('<!>') operator allows
+-- us to combine two alternatives as seen below. The config-value
+-- language distinguishes between atoms like @random@ and strings like
+-- @"random"@ allowing unambiguous special cases to be added in addition
+-- to free-form text.
+--
+-- @
+-- {-\# Language RecordWildCards, OverloadedStrings, ApplicativeDo \#-}
+-- module Example where
+--
+-- import "Config.Schema"
+-- import "Data.Functor.Alt" (('<!>'))
+-- import "Data.Maybe"       ('Data.Maybe.fromMaybe')
+-- import "Data.Text"        ('Text')
+--
+-- data Config = Config
+--   { userName :: UserName
+--   , retries  :: 'Int'
+--   }
+--
+-- data UserName = Random | Given 'Text'
+--
+-- userNameSpec :: ValueSpec UserName
+-- userNameSpec = Random '<$'  'atomSpec' \"random\"
+--            '<!>' Given  '<$>' 'anySpec' -- matches string literals
+--
+-- nameExample :: 'ValueSpec' Config
+-- nameExample = 'sectionsSpec' \"config\" '$'
+--
+--   do userName <- 'reqSection'' \"username\" userNameSpec \"Configured user name\"
+--
+--      retries  <- 'Data.Maybe.fromMaybe' 3
+--              '<$>' 'optSection' \"retries\" \"Number of attempts (default: 3)\"
+--
+--      'pure' Config{..}
+-- @
+--
+-- Examples:
+--
+-- > username: random
+-- > retries: 5
+-- > -- Generates: Config { userName = Random, retries = 5 }
+--
+-- We can omit the retries:
+--
+-- > username: random
+-- > -- Generates: Config { userName = Random, retries = 3 }
+--
+-- We can specify a specific username as a string literal instead
+-- of using the atom @random@:
+--
+-- > username: "me"
+-- > -- Generates: Config { userName = Given "me", retries = 3 }
+--
+-- Sections can be reordered:
+--
+-- > retries: 5
+-- > username: random
+-- > -- Generates: Config { userName = Random, retries = 5 }
 
 -- | Class of value specifications that don't require arguments.
 class    HasSpec a        where anySpec :: ValueSpec a
