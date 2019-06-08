@@ -44,7 +44,7 @@ exampleFile =
 exampleValue :: Value Position
 Right exampleValue = parse exampleFile
 
-exampleSpec :: ValueSpecs Text
+exampleSpec :: ValueSpec Text
 exampleSpec = sectionsSpec "" $
   do name  <- reqSection  "name" "Full name"
      age   <- reqSection  "age"  "Age of user"
@@ -63,12 +63,12 @@ exampleSpec = sectionsSpec "" $
              Text.intercalate ", " kids <>
              happyText
 
-kidSpec :: ValueSpecs Text
+kidSpec :: ValueSpec Text
 kidSpec = sectionsSpec "kid" (reqSection "name" "Kid's name")
 
 
 -- | Matches the 'yes' and 'no' atoms
-yesOrNo :: ValueSpecs Bool
+yesOrNo :: ValueSpec Bool
 yesOrNo = True  <$ atomSpec "yes" <!>
           False <$ atomSpec "no"
 
