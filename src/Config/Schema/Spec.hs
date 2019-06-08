@@ -33,6 +33,7 @@ module Config.Schema.Spec
   , HasSpec(..)
 
   -- * Specifying sections
+  -- $sections
   , SectionsSpec
   , reqSection
   , optSection
@@ -60,48 +61,6 @@ import qualified Data.Text as Text
 import           Data.Word
 
 import           Config.Schema.Types
-
-
-------------------------------------------------------------------------
--- 'SectionsSpec' builders
-------------------------------------------------------------------------
-
-
--- | Specification for a required section with an implicit value specification.
-reqSection ::
-  HasSpec a =>
-  Text {- ^ section name -} ->
-  Text {- ^ description  -} ->
-  SectionsSpec a
-reqSection n = reqSection' n anySpec
-
-
--- | Specification for a required section with an explicit value specification.
-reqSection' ::
-  Text         {- ^ section name        -} ->
-  ValueSpec a {- ^ value specification -} ->
-  Text         {- ^ description         -} ->
-  SectionsSpec a
-reqSection' n w i = primSectionsSpec (ReqSection n i w)
-
-
--- | Specification for an optional section with an implicit value specification.
-optSection ::
-  HasSpec a =>
-  Text {- ^ section name -} ->
-  Text {- ^ description  -} ->
-  SectionsSpec (Maybe a)
-optSection n = optSection' n anySpec
-
-
--- | Specification for an optional section with an explicit value specification.
-optSection' ::
-  Text         {- ^ section name        -} ->
-  ValueSpec a {- ^ value specification -} ->
-  Text         {- ^ description         -} ->
-  SectionsSpec (Maybe a)
-optSection' n w i = primSectionsSpec (OptSection n i w)
-
 
 ------------------------------------------------------------------------
 -- 'ValueSpec' builders
@@ -223,3 +182,94 @@ nonemptySpec s = customSpec "nonempty" (listSpec s) NonEmpty.nonEmpty
 -- @since 0.2.0.0
 oneOrNonemptySpec :: ValueSpec a -> ValueSpec (NonEmpty a)
 oneOrNonemptySpec s = pure <$> s <!> nonemptySpec s
+
+
+------------------------------------------------------------------------
+-- 'SectionsSpec' builders
+------------------------------------------------------------------------
+
+-- $sections
+-- Sections specifications allow you to define an unordered collection
+-- of required and optional sections using a convenient 'Applicative'
+-- do-notation syntax.
+--
+-- Let's consider an example of a way to specify a name given a base
+-- and optional suffix.
+--
+-- @
+-- {-\# Language OverloadedStrings, ApplicativeDo \#-}
+-- module Example where
+--
+-- import "Config.Schema"
+-- import "Data.Text" ('Text')
+--
+-- nameExample :: 'ValueSpec' 'Text'
+-- nameExample =
+--   'sectionsSpec' \"name\" '$'
+--   do x <- 'reqSection' \"base\" \"Base name\"
+--      y <- 'optSection' \"suffix\" \"Optional name suffix\"
+--      'pure' ('maybe' x (x '<>') y)
+-- @
+--
+-- Example configuration components and their extracted values.
+--
+-- > base:     "VAR"
+-- > optional: "1"
+-- > -- Generates: VAR1
+--
+-- Order doesn't matter
+--
+-- > optional: "1"
+-- > base:     "VAR"
+-- > -- Generates: VAR1
+--
+-- Optional fields can be omitted
+--
+-- > base:     "VAR"
+-- > -- Generates: VAR
+--
+-- Unexpected sections will generate errors to help detect typos
+--
+-- > base:     "VAR"
+-- > extra:    0
+-- > -- Failure due to unexpected extra section
+--
+-- All required sections must appear for successful match
+--
+-- > optional: "1"
+-- > -- Failure due to missing required section
+
+-- | Specification for a required section with an implicit value specification.
+reqSection ::
+  HasSpec a =>
+  Text {- ^ section name -} ->
+  Text {- ^ description  -} ->
+  SectionsSpec a
+reqSection n = reqSection' n anySpec
+
+
+-- | Specification for a required section with an explicit value specification.
+reqSection' ::
+  Text         {- ^ section name        -} ->
+  ValueSpec a {- ^ value specification -} ->
+  Text         {- ^ description         -} ->
+  SectionsSpec a
+reqSection' n w i = primSectionsSpec (ReqSection n i w)
+
+
+-- | Specification for an optional section with an implicit value specification.
+optSection ::
+  HasSpec a =>
+  Text {- ^ section name -} ->
+  Text {- ^ description  -} ->
+  SectionsSpec (Maybe a)
+optSection n = optSection' n anySpec
+
+
+-- | Specification for an optional section with an explicit value specification.
+optSection' ::
+  Text         {- ^ section name        -} ->
+  ValueSpec a {- ^ value specification -} ->
+  Text         {- ^ description         -} ->
+  SectionsSpec (Maybe a)
+optSection' n w i = primSectionsSpec (OptSection n i w)

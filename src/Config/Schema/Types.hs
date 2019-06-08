@@ -1,4 +1,4 @@
-{-# Language KindSignatures, RankNTypes, GADTs, DeriveTraversable, GeneralizedNewtypeDeriving #-}
+{-# Language CPP, KindSignatures, RankNTypes, GADTs, DeriveTraversable, GeneralizedNewtypeDeriving #-}
 {-|
 Module      : Config.Schema.Types
 Description : Types for describing a configuration file format.
@@ -42,6 +42,10 @@ import           Data.Functor.Coyoneda    (Coyoneda(..), liftCoyoneda, lowerCoyo
 import           Data.List.NonEmpty       (NonEmpty)
 import           Data.Semigroup.Foldable  (asum1, foldMap1)
 import           Data.Text                (Text)
+
+#if !MIN_VERSION_base(4,11,0)
+import           Data.Semigroup           (Semigroup)
+#endif
 
 ------------------------------------------------------------------------
 -- Specifications for values
