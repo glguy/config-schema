@@ -1,4 +1,4 @@
-{-# Language OverloadedStrings, GeneralizedNewtypeDeriving, GADTs #-}
+{-# Language GeneralizedNewtypeDeriving, GADTs #-}
 {-|
 Module      : Config.Schema.Load
 Description : Operations to extract a value from a configuration.
@@ -15,30 +15,25 @@ module Config.Schema.Load
   , loadValueFromFile
 
   -- * Errors
-  , SchemaError(..)
-  , LoadError(..)
+  , ValueSpecMismatch(..)
+  , PrimMismatch(..)
   , Problem(..)
   ) where
 
-import           Control.Exception                (Exception(..), throwIO)
+import           Control.Exception                (throwIO)
 import           Control.Monad                    (zipWithM)
 import           Control.Monad.Trans.Class        (lift)
-import           Control.Monad.Trans.State        (StateT(..), runStateT)
-import           Control.Monad.Trans.Except       (Except, runExcept, throwE)
-import           Control.Monad.Trans.Reader       (ReaderT, runReaderT, ask, local)
-import           Data.Semigroup.Foldable          (asum1)
-import           Data.Functor.Alt                 (Alt((<!>)))
-import           Data.Monoid                      ((<>))
+import           Control.Monad.Trans.State        (StateT(..), runStateT, state)
+import           Control.Monad.Trans.Except       (Except, runExcept, throwE, withExcept)
 import           Data.Ratio                       (numerator, denominator)
 import           Data.List.NonEmpty               (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Text                        (Text)
-import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 
 import           Config
-import           Config.Schema.Spec
 import           Config.Schema.Types
+import           Config.Schema.Load.Error
 
 
 -- | Match a 'Value' against a 'ValueSpec' and return either
@@ -47,135 +42,108 @@ import           Config.Schema.Types
 loadValue ::
   ValueSpec a                       {- ^ specification           -} ->
   Value p                           {- ^ value                   -} ->
-  Either (NonEmpty (LoadError p)) a {- ^ errors or decoded value -}
-loadValue spec val = runLoad (getValue spec val)
+  Either (ValueSpecMismatch p) a {- ^ errors or decoded value -}
+loadValue spec val = runExcept (getValue spec val)
 
 
 -- | Read a configuration file, parse it, and validate it according
 -- to the given specification.
 --
--- Throws 'IOError', 'ParseError', or 'SchemaError'
+-- Throws 'IOError', 'ParseError', or 'ValueSpecMismatch'
 loadValueFromFile ::
   ValueSpec a {- ^ specification -} ->
   FilePath    {- ^ filename      -} ->
   IO a
 loadValueFromFile spec path =
   do txt <- Text.readFile path
-     val <- either throwIO return (parse txt)
-     either (throwIO . SchemaError) return (loadValue spec val)
+     let exceptIO m = either throwIO return m
+     val <- exceptIO (parse txt)
+     exceptIO (loadValue spec val)
+
+getSection :: PrimSectionSpec a -> StateT [Section p] (Except (Problem p)) a
+getSection (ReqSection k _ w) =
+  do mb <- state (lookupSection k)
+     lift $ case mb of
+       Just v -> getValue' (SubkeyProblem k) w v
+       Nothing -> throwE (MissingSection k)
+getSection (OptSection k _ w) =
+  do mb <- state (lookupSection k)
+     lift (traverse (getValue' (SubkeyProblem k) w) mb)
 
 
--- | Newtype wrapper for schema load errors.
-newtype SchemaError = SchemaError (NonEmpty (LoadError Position))
-  deriving Show
-
--- | Custom 'displayException' implementation
-instance Exception SchemaError where
-  displayException (SchemaError e) = foldr showLoadError "" e
-    where
-      showLoadError (LoadError pos path problem)
-        = shows (posLine pos)
-        . showChar ':'
-        . shows (posColumn pos)
-        . showString ": "
-        . foldr (\x xs -> showString (Text.unpack x) . showChar ':' . xs) id path
-        . showChar ' '
-        . showProblem problem
-        . showChar '\n'
-
-      showProblem p =
-        case p of
-          MissingSection x -> showString "missing required section `"
-                            . showString (Text.unpack x) . showChar '`'
-          UnusedSection  x -> showString "unused section `"
-                            . showString (Text.unpack x) . showChar '`'
-          SpecMismatch   x -> showString "expected " . showString (Text.unpack x)
-
-
-getSection :: p -> PrimSectionSpec a -> StateT [Section p] (Load p) a
-getSection pos (ReqSection k _ w) =
-  do v <- StateT (lookupSection pos k)
-     lift (scope k (getValue w v))
-getSection pos (OptSection k _ w) =
-  do mb <- optional1 (StateT (lookupSection pos k))
-     lift (traverse (scope k . getValue w) mb)
-
-
-getSections :: p -> SectionsSpec a -> [Section p] -> Load p a
-getSections pos spec xs =
-  do (a,leftovers) <- runStateT (runSections (getSection pos) spec) xs
+getSections :: SectionsSpec a -> [Section p] -> Except (Problem p) a
+getSections spec xs =
+  do (a,leftovers) <- runStateT (runSections getSection spec) xs
      case NonEmpty.nonEmpty leftovers of
        Nothing -> return a
-       Just ss -> asum1 (fmap (\s -> loadFail (sectionAnn s) (UnusedSection (sectionName s))) ss)
+       Just ss -> throwE (UnusedSections (fmap sectionName ss))
 
 
-getValue :: ValueSpec a -> Value p -> Load p a
-getValue s v = runValueSpec (getValue1 v) s
+getValue :: ValueSpec a -> Value p -> Except (ValueSpecMismatch p) a
+getValue s v = withExcept (ValueSpecMismatch v) (runValueSpec (getValue1 v) s)
 
+-- | Match a 'Value' against a 'ValueSpec' given a wrapper for any nested
+-- mismatch errors that might occur.
+getValue' ::
+  (ValueSpecMismatch p -> Problem p) ->
+  ValueSpec a ->
+  Value p ->
+  Except (Problem p) a
+getValue' p s v = withExcept (p . ValueSpecMismatch v) (runValueSpec (getValue1 v) s)
+
+getValue1 :: Value p -> PrimValueSpec a -> Except (NonEmpty (PrimMismatch p)) a
+getValue1 v prim = withExcept (pure . PrimMismatch (describeSpec prim))
+                              (getValue2 v prim)
 
 -- | Match a primitive value specification against a single value.
-getValue1 :: Value p -> PrimValueSpec a -> Load p a
-getValue1 (Text _ t)       TextSpec           = pure t
-getValue1 (Number _ _ n)   IntegerSpec        = pure n
-getValue1 (Floating _ a b) IntegerSpec | Just i <- floatingToInteger a b = pure i
-getValue1 (Number _ _ n)   RationalSpec       = pure (fromInteger n)
-getValue1 (Floating _ a b) RationalSpec       = pure (floatingToRational a b)
-getValue1 (List _ xs)      (ListSpec w)       = getList w xs
-getValue1 (Atom _ b)       AnyAtomSpec        = pure (atomName b)
-getValue1 (Atom _ b)       (AtomSpec a) | a == atomName b = pure ()
-getValue1 (Sections p s)   (SectionsSpec _ w) = getSections p w s
-getValue1 (Sections _ s)   (AssocSpec w)      = getAssoc w s
-getValue1 v                (NamedSpec _ w)    = getValue w v
-getValue1 v                (CustomSpec l w)   = getCustom l w v
-
-getValue1 v TextSpec           = loadFail (valueAnn v) (SpecMismatch "text")
-getValue1 v IntegerSpec        = loadFail (valueAnn v) (SpecMismatch "integer")
-getValue1 v RationalSpec       = loadFail (valueAnn v) (SpecMismatch "number")
-getValue1 v ListSpec{}         = loadFail (valueAnn v) (SpecMismatch "list")
-getValue1 v AnyAtomSpec        = loadFail (valueAnn v) (SpecMismatch "atom")
-getValue1 v (AtomSpec a)       = loadFail (valueAnn v) (SpecMismatch ("`" <> a <> "`"))
-getValue1 v (SectionsSpec l _) = loadFail (valueAnn v) (SpecMismatch l)
-getValue1 v AssocSpec{}        = loadFail (valueAnn v) (SpecMismatch "association list")
+getValue2 :: Value p -> PrimValueSpec a -> Except (Problem p) a
+getValue2 (Text _ t)       TextSpec           = pure t
+getValue2 (Number _ _ n)   IntegerSpec        = pure n
+getValue2 (Floating _ a b) IntegerSpec | Just i <- floatingToInteger a b = pure i
+getValue2 (Number _ _ n)   RationalSpec       = pure (fromInteger n)
+getValue2 (Floating _ a b) RationalSpec       = pure (floatingToRational a b)
+getValue2 (List _ xs)      (ListSpec w)       = getList w xs
+getValue2 (Atom _ b)       AnyAtomSpec        = pure (atomName b)
+getValue2 (Atom _ b)       (AtomSpec a) | a == atomName b = pure ()
+getValue2 (Sections _ s)   (SectionsSpec _ w) = getSections w s
+getValue2 (Sections _ s)   (AssocSpec w)      = getAssoc w s
+getValue2 v                (NamedSpec _ w)    = getValue' NestedProblem w v
+getValue2 v                (CustomSpec _ w)   = getCustom w v
+getValue2 _                _                  = throwE TypeMismatch
 
 
 -- | This operation processes all of the values in a list with the given
 -- value specification and updates the scope with a one-based list index.
-getList :: ValueSpec a -> [Value p] -> Load p [a]
-getList w = zipWithM (\i x -> scope (Text.pack (show i)) (getValue w x)) [1::Int ..]
+getList :: ValueSpec a -> [Value p] -> Except (Problem p) [a]
+getList w = zipWithM (\i -> getValue' (ListElementProblem i) w) [1::Int ..]
 
 
 -- | This operation processes all of the values in a section list
 -- against the given specification and associates them with the
 -- section name.
-getAssoc :: ValueSpec a -> [Section p] -> Load p [(Text,a)]
-getAssoc w = traverse $ \(Section _ k v) -> (,) k <$> scope k (getValue w v)
-
+getAssoc :: ValueSpec a -> [Section p] -> Except (Problem p) [(Text,a)]
+getAssoc w = traverse $ \(Section _ k v) ->
+                 (,) k <$> getValue' (SubkeyProblem k) w v
 
 -- | Match a value against its specification. If 'Just' is matched
 -- return the value. If 'Nothing is matched, report an error.
 getCustom ::
-  Text                {- ^ label         -} ->
-  ValueSpec (Maybe a) {- ^ specification -} ->
-  Value p             {- ^ value         -} ->
-  Load p a
-getCustom l w v =
-  do x <- getValue w v
-     case x of
-       Nothing -> loadFail (valueAnn v) (SpecMismatch l)
-       Just y  -> pure y
+  ValueSpec (Either Text a) {- ^ specification -} ->
+  Value p                   {- ^ value         -} ->
+  Except (Problem p) a
+getCustom w v = either (throwE . CustomProblem) pure =<< getValue' NestedProblem w v
 
 
 -- | Extract a section from a list of sections by name.
 lookupSection ::
-  p                             {- ^ starting position of sections      -} ->
-  Text                          {- ^ section name                       -} ->
-  [Section p]                   {- ^ available sections                 -} ->
-  Load p (Value p, [Section p]) {- ^ found value and remaining sections -}
-lookupSection pos key [] = loadFail pos (MissingSection key)
-lookupSection pos key (s@(Section _ k v):xs)
-  | key == k  = pure (v, xs)
-  | otherwise = do (v',xs') <- lookupSection pos key xs
-                   return (v',s:xs')
+  Text                         {- ^ section name                       -} ->
+  [Section p]                  {- ^ available sections                 -} ->
+  (Maybe (Value p), [Section p]) {- ^ found value and remaining sections -}
+lookupSection _ [] = (Nothing, [])
+lookupSection key (s@(Section _ k v):xs)
+  | key == k  = (Just v, xs)
+  | otherwise = case lookupSection key xs of
+                  (res, xs') -> (res, s:xs')
 
 ------------------------------------------------------------------------
 
@@ -190,53 +158,3 @@ floatingToInteger x y
   | denominator r == 1 = Just (numerator r)
   | otherwise          = Nothing
   where r = floatingToRational x y
-
-------------------------------------------------------------------------
--- Error reporting type
-------------------------------------------------------------------------
-
-
--- | Type used to match values against specifiations. This type tracks
--- the current nested fields (updated with scope) and can throw
--- errors using loadFail.
-newtype Load p a = MkLoad { unLoad :: ReaderT [Text] (Except (NonEmpty (LoadError p))) a }
-  deriving (Functor, Applicative, Monad)
-
-instance Alt (Load p) where MkLoad x <!> MkLoad y = MkLoad (x <!> y)
-
--- | Type for errors that can be encountered while decoding a value according
--- to a specification. The error includes a key path indicating where in
--- the configuration file the error occurred.
-data LoadError p = LoadError p [Text] Problem -- ^ position, path, problem
-  deriving (Read, Show)
-
-
--- | Run the Load computation until it produces a result or terminates
--- with a list of errors.
-runLoad :: Load p a -> Either (NonEmpty (LoadError p)) a
-runLoad = runExcept . flip runReaderT [] . unLoad
-
-
--- | Problems that can be encountered when matching a 'Value' against a 'ValueSpec'.
-data Problem
-  = MissingSection Text -- ^ missing section name
-  | UnusedSection Text  -- ^ unused section names
-  | SpecMismatch Text   -- ^ failed specification name
-  deriving (Eq, Ord, Read, Show)
-
--- | Push a new key onto the stack of nested fields.
-scope :: Text -> Load p a -> Load p a
-scope key (MkLoad m) = MkLoad (local (key:) m)
-
--- | Abort value specification matching with the given error.
-loadFail :: p -> Problem -> Load p a
-loadFail pos cause = MkLoad $
-  do path <- ask
-     lift (throwE (pure (LoadError pos (reverse path) cause)))
-
-------------------------------------------------------------------------
-
--- | One or none. This definition is different from the normal @optional@ definition
--- because it uses 'Alt'. This allows it to work on types that are not @Alternative@.
-optional1 :: (Applicative f, Alt f) => f a -> f (Maybe a)
-optional1 fa = Just <$> fa <!> pure Nothing

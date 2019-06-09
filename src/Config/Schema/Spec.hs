@@ -9,9 +9,9 @@ License     : ISC
 Maintainer  : emertens@gmail.com
 
 This module provides a set of types and operations for defining configuration
-file schemas. These schemas can be built up using 'Applicative' operations.
+file schemas.
 
-These specifications are suitable for be consumed by "Config.Schema.Load"
+These specifications are can be consumed by "Config.Schema.Load"
 and "Config.Schema.Docs".
 
 This is the schema system used by the @glirc@ IRC client
@@ -163,7 +163,11 @@ instance (HasSpec a, HasSpec b) => HasSpec (Either a b) where
   anySpec = Left <$> anySpec <!> Right <$> anySpec
 
 sizedBitsSpec :: (Integral a, Bits a) => Text -> ValueSpec a
-sizedBitsSpec name = customSpec name (primValueSpec IntegerSpec) toIntegralSized
+sizedBitsSpec name = customSpec name (primValueSpec IntegerSpec) check
+  where
+    check i = case toIntegralSized i of
+                Nothing -> Left "out of bounds"
+                Just j  -> Right j
 
 -- | Specification for matching a particular atom.
 atomSpec :: Text -> ValueSpec ()
@@ -234,7 +238,7 @@ oneOrList s = pure <$> s <!> listSpec s
 -- | The custom specification allows an arbitrary function to be used
 -- to validate the value extracted by a specification. If 'Nothing'
 -- is returned the value is considered to have failed validation.
-customSpec :: Text -> ValueSpec a -> (a -> Maybe b) -> ValueSpec b
+customSpec :: Text -> ValueSpec a -> (a -> Either Text b) -> ValueSpec b
 customSpec lbl w f = primValueSpec (CustomSpec lbl (f <$> w))
 
 
@@ -249,7 +253,11 @@ yesOrNoSpec = True  <$ atomSpec (Text.pack "yes")
 --
 -- @since 0.2.0.0
 nonemptySpec :: ValueSpec a -> ValueSpec (NonEmpty a)
-nonemptySpec s = customSpec "nonempty" (listSpec s) NonEmpty.nonEmpty
+nonemptySpec s = customSpec "nonempty" (listSpec s) check
+  where
+    check xs = case NonEmpty.nonEmpty xs of
+                 Nothing -> Left "empty list"
+                 Just xxs -> Right xxs
 
 -- | Matches a single element or a non-empty list.
 --
@@ -324,9 +332,9 @@ reqSection n = reqSection' n anySpec
 
 -- | Specification for a required section with an explicit value specification.
 reqSection' ::
-  Text         {- ^ section name        -} ->
+  Text        {- ^ section name        -} ->
   ValueSpec a {- ^ value specification -} ->
-  Text         {- ^ description         -} ->
+  Text        {- ^ description         -} ->
   SectionsSpec a
 reqSection' n w i = primSectionsSpec (ReqSection n i w)
 
@@ -342,8 +350,8 @@ optSection n = optSection' n anySpec
 
 -- | Specification for an optional section with an explicit value specification.
 optSection' ::
-  Text         {- ^ section name        -} ->
+  Text        {- ^ section name        -} ->
   ValueSpec a {- ^ value specification -} ->
-  Text         {- ^ description         -} ->
+  Text        {- ^ description         -} ->
   SectionsSpec (Maybe a)
 optSection' n w i = primSectionsSpec (OptSection n i w)

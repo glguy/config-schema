@@ -28,6 +28,7 @@ library
     Config.Schema
     Config.Schema.Docs
     Config.Schema.Load
+    Config.Schema.Load.Error
     Config.Schema.Spec
     Config.Schema.Types
 

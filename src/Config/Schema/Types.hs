@@ -1,4 +1,4 @@
-{-# Language CPP, KindSignatures, RankNTypes, GADTs, DeriveTraversable, GeneralizedNewtypeDeriving #-}
+{-# Language StandaloneDeriving, CPP, KindSignatures, RankNTypes, GADTs, DeriveTraversable, GeneralizedNewtypeDeriving #-}
 {-|
 Module      : Config.Schema.Types
 Description : Types for describing a configuration file format.
@@ -81,9 +81,9 @@ data PrimValueSpec :: * -> * where
 
   -- | Documentation text and underlying specification. This specification
   -- will match values where the underlying specification returns a
-  -- 'Just' value. 'Nothing' matches are considering to be outside
-  -- this specification.
-  CustomSpec :: Text -> ValueSpec (Maybe a) -> PrimValueSpec a
+  -- 'Right' value. Otherwise a 'Left' should contain a short failure 
+  -- explanation.
+  CustomSpec :: Text -> ValueSpec (Either Text a) -> PrimValueSpec a
 
   -- | Label used to hide complex specifications in documentation.
   NamedSpec :: Text -> ValueSpec a -> PrimValueSpec a
