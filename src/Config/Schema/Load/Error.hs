@@ -35,6 +35,7 @@ import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Typeable (Typeable)
 import           Text.PrettyPrint
                     (Doc, fsep, ($+$), nest, text, vcat, (<+>), empty, punctuate, comma)
+import           Data.Monoid ((<>))
 
 import           Config
 import           Config.Schema.Types
