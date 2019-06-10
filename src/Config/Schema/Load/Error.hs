@@ -10,6 +10,12 @@ This module provides a complete skeleton of the failures that
 occurred when trying to match a 'Value' against a 'ValueSpec'
 allowing custom error rendering to be implemented.
 
+The structure is you get a single value and a list of one-or-more
+primitive specifications that it failed to match along with
+an enumeration of why that specification failed to match. Some
+failures are due to failures in nested specifications, so the
+whole error structure can form a tree.
+
 -}
 module Config.Schema.Load.Error
   (
@@ -64,25 +70,27 @@ data Problem p
   | CustomProblem Text                           -- ^ custom spec error message
   deriving Show
 
+-- | Describe outermost shape of a 'PrimValueSpec'
 describeSpec :: PrimValueSpec a -> Text
-describeSpec TextSpec              = "text"
-describeSpec IntegerSpec           = "integer"
-describeSpec RationalSpec          = "number"
-describeSpec AnyAtomSpec           = "atom"
-describeSpec (AtomSpec a)          = "`" <> a <> "`"
-describeSpec (ListSpec _)          = "list"
-describeSpec (SectionsSpec name _) = name
-describeSpec (AssocSpec _)         = "association list"
-describeSpec (CustomSpec name _)   = name
-describeSpec (NamedSpec name _)    = name
+describeSpec TextSpec                   = "text"
+describeSpec IntegerSpec                = "integer"
+describeSpec RationalSpec               = "number"
+describeSpec AnyAtomSpec                = "atom"
+describeSpec (AtomSpec a)               = "atom `" <> a <> "`"
+describeSpec (ListSpec _)               = "list"
+describeSpec (SectionsSpec name _)      = name
+describeSpec (AssocSpec _)              = "sections"
+describeSpec (CustomSpec name _)        = name
+describeSpec (NamedSpec name _)         = name
 
+-- | Describe outermost shape of a 'Value'
 describeValue :: Value p -> String
-describeValue Text{}     = "text"
-describeValue Number{}   = "integer"
-describeValue Floating{} = "number"
-describeValue (Atom _ a) = "`" <> Text.unpack (atomName a) <> "`"
-describeValue Sections{} = "sections"
-describeValue List{}     = "list"
+describeValue Text{}                    = "text"
+describeValue Number{}                  = "integer"
+describeValue Floating{}                = "number"
+describeValue (Atom _ a)                = "atom `" <> Text.unpack (atomName a) <> "`"
+describeValue Sections{}                = "sections"
+describeValue List{}                    = "list"
 
 
 prettyValueSpecMismatch :: ErrorAnnotation p => ValueSpecMismatch p -> Doc
@@ -111,7 +119,7 @@ prettyProblem p =
     MissingSection name -> (text "- missing section:" <+> text (Text.unpack name), empty)
     UnusedSections names -> (text "- unexpected sections:"
                         <+> fsep (punctuate comma (map (text . Text.unpack) (toList names))), empty)
-    CustomProblem e -> (text (Text.unpack e), empty)
+    CustomProblem e -> (text "-" <+> text (Text.unpack e), empty)
     TypeMismatch  -> (empty, empty)
     SubkeyProblem name e ->
       (text "- problem in section:" <+> text (Text.unpack name), prettyValueSpecMismatch e)
@@ -124,6 +132,9 @@ class (Typeable a, Show a) => ErrorAnnotation a where
 
 instance ErrorAnnotation Position where
   displayAnnotation pos = show (posLine pos) ++ ":" ++ show (posColumn pos) ++ ":"
+
+instance ErrorAnnotation () where
+  displayAnnotation _ = ""
 
 -- | 'displayException' implemented with 'prettyValueSpecMismatch'
 instance ErrorAnnotation p => Exception (ValueSpecMismatch p) where
