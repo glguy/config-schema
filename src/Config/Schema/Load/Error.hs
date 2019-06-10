@@ -40,6 +40,7 @@ import           Data.Text (Text)
 import           Data.Foldable (toList)
 import qualified Data.Text as Text
 import           Data.List.NonEmpty (NonEmpty((:|)))
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Typeable (Typeable)
 import           Text.PrettyPrint
                     (Doc, fsep, ($+$), nest, text, vcat, (<+>), empty,
@@ -73,6 +74,7 @@ data Problem p
   | NestedProblem          (ValueSpecMismatch p) -- ^ generic nested error
   | TypeMismatch                                 -- ^ value and spec type mismatch
   | CustomProblem Text                           -- ^ custom spec error message
+  | WrongAtom                                    -- ^ atoms didn't match
   deriving Show
 
 -- | Describe outermost shape of a 'PrimValueSpec'
@@ -97,21 +99,53 @@ describeValue (Atom _ a) = "atom `" <> Text.unpack (atomName a) <> "`"
 describeValue Sections{} = "sections"
 describeValue List{}     = "list"
 
+-- | Bottom-up transformation of a 'ValueSpecMismatch'
+rewriteMismatch ::
+  (ValueSpecMismatch p -> ValueSpecMismatch p) ->
+  ValueSpecMismatch p -> ValueSpecMismatch p
+rewriteMismatch f (ValueSpecMismatch v prims) = f (ValueSpecMismatch v (fmap aux1 prims))
+  where
+    aux1 (PrimMismatch spec prob) = PrimMismatch spec (aux2 prob)
+
+    aux2 (SubkeyProblem      x y) = SubkeyProblem      x (rewriteMismatch f y)
+    aux2 (ListElementProblem x y) = ListElementProblem x (rewriteMismatch f y)
+    aux2 (NestedProblem        y) = NestedProblem        (rewriteMismatch f y)
+    aux2 prob                     = prob
+
+-- | Single-step rewrite that removes type-mismatch problems if there
+-- are non-mismatches available to focus on.
+removeTypeMismatch1 :: ValueSpecMismatch p -> ValueSpecMismatch p
+removeTypeMismatch1 (ValueSpecMismatch v xs)
+  | Just xs' <- NonEmpty.nonEmpty (NonEmpty.filter isNotTypeMismatch xs)
+  = ValueSpecMismatch v xs'
+  where
+    isNotTypeMismatch (PrimMismatch _ TypeMismatch) = False
+    isNotTypeMismatch _                             = True
+removeTypeMismatch1 v = v
+
+-- | Single-step rewrite that removes mismatches with only a single,
+-- nested mismatch below them.
+focusMismatch1 :: ValueSpecMismatch p -> ValueSpecMismatch p
+focusMismatch1 x@(ValueSpecMismatch _ prims)
+  | PrimMismatch _ problem :| [] <- prims
+  , Just sub <- simplify1 problem = sub
+  | otherwise = x
+  where
+    simplify1 (SubkeyProblem      _ p) = Just p
+    simplify1 (ListElementProblem _ p) = Just p
+    simplify1 (NestedProblem        p) = Just p
+    simplify1 _                        = Nothing
+
+
 -- | Pretty-printer for 'ValueSpecMismatch' showing the position
 -- and type of value that failed to match along with details about
 -- each specification that it didn't match.
 prettyValueSpecMismatch :: ErrorAnnotation p => ValueSpecMismatch p -> Doc
 prettyValueSpecMismatch (ValueSpecMismatch v es) =
-  heading $+$ nest 4 errors
+  heading $+$ errors
   where
-    heading = displayAnnotation (valueAnn v)
-          <+> text (describeValue v)
-          <+> text reason
+    heading = displayAnnotation (valueAnn v) <> text (describeValue v)
     errors = vcat (map prettyPrimMismatch (toList es))
-
-    reason
-      | _ :| [] <- es = "failed to match spec:"
-      | otherwise     = "failed to match specs:"
 
 
 -- | Pretty-printer for 'PrimMismatch' showing a summary of the primitive
@@ -131,7 +165,12 @@ prettyProblem ::
   (Doc, Doc) {- ^ summary, detailed -}
 prettyProblem p =
   case p of
-    TypeMismatch -> (empty, empty)
+    TypeMismatch ->
+      ( text "- type mismatch"
+      , empty)
+    WrongAtom ->
+      ( text "- wrong atom"
+      , empty)
     MissingSection name ->
       ( text "- missing section:" <+> text (Text.unpack name)
       , empty)
@@ -166,4 +205,4 @@ instance ErrorAnnotation () where
 
 -- | 'displayException' implemented with 'prettyValueSpecMismatch'
 instance ErrorAnnotation p => Exception (ValueSpecMismatch p) where
-  displayException = show . prettyValueSpecMismatch
+  displayException = show . prettyValueSpecMismatch . rewriteMismatch (focusMismatch1 . removeTypeMismatch1)
