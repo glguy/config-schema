@@ -23,12 +23,14 @@ module Config.Schema.Load.Error
     ValueSpecMismatch(..)
   , PrimMismatch(..)
   , Problem(..)
+  , ErrorAnnotation(..)
 
-  -- * Rendering
+  -- * Detailed rendering
   , prettyValueSpecMismatch
   , prettyPrimMismatch
   , prettyProblem
 
+  -- * Summaries
   , describeSpec
   , describeValue
   ) where
@@ -40,7 +42,8 @@ import qualified Data.Text as Text
 import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Typeable (Typeable)
 import           Text.PrettyPrint
-                    (Doc, fsep, ($+$), nest, text, vcat, (<+>), empty, punctuate, comma)
+                    (Doc, fsep, ($+$), nest, text, vcat, (<+>), empty,
+                     punctuate, comma, int, colon, hcat)
 import           Data.Monoid ((<>))
 
 import           Config
@@ -48,6 +51,7 @@ import           Config.Schema.Types
 
 -- | Newtype wrapper for schema load errors.
 data ValueSpecMismatch p =
+  -- | Problem value and list of specification failures
   ValueSpecMismatch (Value p) (NonEmpty (PrimMismatch p))
   deriving Show
 
@@ -55,7 +59,8 @@ data ValueSpecMismatch p =
 -- to a specification. The error includes a key path indicating where in
 -- the configuration file the error occurred.
 data PrimMismatch p =
-  PrimMismatch Text (Problem p) -- ^ spec description and problem
+  -- | spec description and problem
+  PrimMismatch Text (Problem p)
   deriving Show
 
 
@@ -85,19 +90,21 @@ describeSpec (NamedSpec name _)         = name
 
 -- | Describe outermost shape of a 'Value'
 describeValue :: Value p -> String
-describeValue Text{}                    = "text"
-describeValue Number{}                  = "integer"
-describeValue Floating{}                = "number"
-describeValue (Atom _ a)                = "atom `" <> Text.unpack (atomName a) <> "`"
-describeValue Sections{}                = "sections"
-describeValue List{}                    = "list"
+describeValue Text{}     = "text"
+describeValue Number{}   = "integer"
+describeValue Floating{} = "number"
+describeValue (Atom _ a) = "atom `" <> Text.unpack (atomName a) <> "`"
+describeValue Sections{} = "sections"
+describeValue List{}     = "list"
 
-
+-- | Pretty-printer for 'ValueSpecMismatch' showing the position
+-- and type of value that failed to match along with details about
+-- each specification that it didn't match.
 prettyValueSpecMismatch :: ErrorAnnotation p => ValueSpecMismatch p -> Doc
 prettyValueSpecMismatch (ValueSpecMismatch v es) =
   heading $+$ nest 4 errors
   where
-    heading = text (displayAnnotation (valueAnn v))
+    heading = displayAnnotation (valueAnn v)
           <+> text (describeValue v)
           <+> text reason
     errors = vcat (map prettyPrimMismatch (toList es))
@@ -107,34 +114,55 @@ prettyValueSpecMismatch (ValueSpecMismatch v es) =
       | otherwise     = "failed to match specs:"
 
 
+-- | Pretty-printer for 'PrimMismatch' showing a summary of the primitive
+-- specification that didn't match followed by a more detailed error when
+-- appropriate.
 prettyPrimMismatch :: ErrorAnnotation p => PrimMismatch p -> Doc
 prettyPrimMismatch (PrimMismatch spec problem) =
   case prettyProblem problem of
     (summary, detail) ->
       (text "*" <+> text (Text.unpack spec) <+> summary) $+$ nest 4 detail
 
-prettyProblem :: ErrorAnnotation p => Problem p -> (Doc, Doc)
+-- | Pretty-printer for 'Problem' that generates a summary line
+-- as well as a detailed description (depending on the error)
+prettyProblem ::
+  ErrorAnnotation p =>
+  Problem p ->
+  (Doc, Doc) {- ^ summary, detailed -}
 prettyProblem p =
   case p of
-    MissingSection name -> (text "- missing section:" <+> text (Text.unpack name), empty)
-    UnusedSections names -> (text "- unexpected sections:"
-                        <+> fsep (punctuate comma (map (text . Text.unpack) (toList names))), empty)
-    CustomProblem e -> (text "-" <+> text (Text.unpack e), empty)
-    TypeMismatch  -> (empty, empty)
+    TypeMismatch -> (empty, empty)
+    MissingSection name ->
+      ( text "- missing section:" <+> text (Text.unpack name)
+      , empty)
+    UnusedSections names ->
+      ( text "- unexpected sections:" <+>
+        fsep (punctuate comma (map (text . Text.unpack) (toList names)))
+      , empty)
+    CustomProblem e ->
+      ( text "-" <+> text (Text.unpack e)
+      , empty)
     SubkeyProblem name e ->
-      (text "- problem in section:" <+> text (Text.unpack name), prettyValueSpecMismatch e)
-    NestedProblem e -> (empty, prettyValueSpecMismatch e)
+      ( text "- problem in section:" <+> text (Text.unpack name)
+      , prettyValueSpecMismatch e)
+    NestedProblem e ->
+      ( empty
+      , prettyValueSpecMismatch e)
     ListElementProblem i e ->
-      (text "- problem in element:" <+> text (show i), prettyValueSpecMismatch e)
+      ( text "- problem in element:" <+> int i
+      , prettyValueSpecMismatch e)
 
+-- | Class for rendering position annotations within the 'prettyValueSpecMismatch'
 class (Typeable a, Show a) => ErrorAnnotation a where
-  displayAnnotation :: a -> String
+  displayAnnotation :: a -> Doc
 
+-- | Renders a 'Position' as @line:column:@
 instance ErrorAnnotation Position where
-  displayAnnotation pos = show (posLine pos) ++ ":" ++ show (posColumn pos) ++ ":"
+  displayAnnotation pos = hcat [int (posLine pos), colon, int (posColumn pos), colon]
 
+-- | Renders as an empty document
 instance ErrorAnnotation () where
-  displayAnnotation _ = ""
+  displayAnnotation _ = empty
 
 -- | 'displayException' implemented with 'prettyValueSpecMismatch'
 instance ErrorAnnotation p => Exception (ValueSpecMismatch p) where

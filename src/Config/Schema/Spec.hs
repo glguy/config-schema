@@ -1,5 +1,4 @@
-{-# Language FlexibleInstances, RankNTypes, GADTs, KindSignatures #-}
-{-# Language DeriveFunctor, GeneralizedNewtypeDeriving, OverloadedStrings #-}
+{-# Language FlexibleInstances, OverloadedStrings #-}
 
 {-|
 Module      : Config.Schema.Spec

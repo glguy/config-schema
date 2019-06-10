@@ -1,4 +1,4 @@
-{-# Language GeneralizedNewtypeDeriving, GADTs #-}
+{-# Language GADTs #-}
 {-|
 Module      : Config.Schema.Load
 Description : Operations to extract a value from a configuration.

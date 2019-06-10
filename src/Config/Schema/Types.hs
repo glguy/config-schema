@@ -1,4 +1,5 @@
-{-# Language StandaloneDeriving, CPP, KindSignatures, RankNTypes, GADTs, DeriveTraversable, GeneralizedNewtypeDeriving #-}
+{-# Language CPP, KindSignatures, RankNTypes, GADTs, DeriveTraversable,
+             GeneralizedNewtypeDeriving #-}
 {-|
 Module      : Config.Schema.Types
 Description : Types for describing a configuration file format.
