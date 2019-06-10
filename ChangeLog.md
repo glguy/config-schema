@@ -1,5 +1,19 @@
 # Revision history for config-schema
 
+## 0.6.0.0
+
+* Rename `ValueSpec` to `PrimValueSpec`
+* Rename `ValueSpecs` to `ValueSpec`
+* Rename `SectionSpec` to `PrimSectionSpec`
+* Rename `SectionSpecs` to `SectionsSpec`
+* Rename `Spec` class to `HasSpec`
+* Rename `valuesSpec` to `anySpec`
+* Custom specifications changed type to expose an error message.
+* Move spec types to `Config.Schema.Types`. Now `Config.Schema.Spec`
+  has only the exports needed for building specs and not defining
+  new spec consumers.
+* Improve schema mismatch type and errors in `Config.Schema.Load.Error`
+
 ## 0.5.0.1
 * Support GHC 8.4.1
 
