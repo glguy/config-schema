@@ -1,6 +1,6 @@
 # Revision history for config-schema
 
-## 0.6.0.0
+## 1.0.0.0
 
 * Rename `ValueSpec` to `PrimValueSpec`
 * Rename `ValueSpecs` to `ValueSpec`
