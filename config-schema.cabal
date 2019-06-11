@@ -1,6 +1,6 @@
 cabal-version:       2.2
 name:                config-schema
-version:             1.0.0.0
+version:             1.1.0.0
 synopsis:            Schema definitions for the config-value package
 description:         This package makes it possible to defined schemas for use when
                      loading configuration files using the config-value format.

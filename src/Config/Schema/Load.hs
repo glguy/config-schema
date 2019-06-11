@@ -80,7 +80,7 @@ getSections spec xs =
 
 
 getValue :: ValueSpec a -> Value p -> Except (ValueSpecMismatch p) a
-getValue s v = withExcept (ValueSpecMismatch v) (runValueSpec (getValue1 v) s)
+getValue s v = withExcept (ValueSpecMismatch (valueAnn v) (describeValue v)) (runValueSpec (getValue1 v) s)
 
 -- | Match a 'Value' against a 'ValueSpec' given a wrapper for any nested
 -- mismatch errors that might occur.
@@ -89,7 +89,7 @@ getValue' ::
   ValueSpec a ->
   Value p ->
   Except (Problem p) a
-getValue' p s v = withExcept (p . ValueSpecMismatch v) (runValueSpec (getValue1 v) s)
+getValue' p s v = withExcept (p . ValueSpecMismatch (valueAnn v) (describeValue v)) (runValueSpec (getValue1 v) s)
 
 getValue1 :: Value p -> PrimValueSpec a -> Except (NonEmpty (PrimMismatch p)) a
 getValue1 v prim = withExcept (pure . PrimMismatch (describeSpec prim))

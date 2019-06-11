@@ -1,5 +1,11 @@
 # Revision history for config-schema
 
+## 1.1.0.0
+
+* Simplify field types of `ValueSpecMismatch`
+* More aggressively eliminate `TypeMismatch` and `WrongAtom`
+  when other, more specific errors, are available.
+
 ## 1.0.0.0
 
 * Rename `ValueSpec` to `PrimValueSpec`

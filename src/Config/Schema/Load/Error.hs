@@ -53,7 +53,7 @@ import           Config.Schema.Types
 -- | Newtype wrapper for schema load errors.
 data ValueSpecMismatch p =
   -- | Problem value and list of specification failures
-  ValueSpecMismatch (Value p) (NonEmpty (PrimMismatch p))
+  ValueSpecMismatch p Text (NonEmpty (PrimMismatch p))
   deriving Show
 
 -- | Type for errors that can be encountered while decoding a value according
@@ -91,11 +91,11 @@ describeSpec (CustomSpec name _)        = name
 describeSpec (NamedSpec name _)         = name
 
 -- | Describe outermost shape of a 'Value'
-describeValue :: Value p -> String
+describeValue :: Value p -> Text
 describeValue Text{}     = "text"
 describeValue Number{}   = "integer"
 describeValue Floating{} = "number"
-describeValue (Atom _ a) = "atom `" <> Text.unpack (atomName a) <> "`"
+describeValue (Atom _ a) = "atom `" <> atomName a <> "`"
 describeValue Sections{} = "sections"
 describeValue List{}     = "list"
 
@@ -103,7 +103,7 @@ describeValue List{}     = "list"
 rewriteMismatch ::
   (ValueSpecMismatch p -> ValueSpecMismatch p) ->
   ValueSpecMismatch p -> ValueSpecMismatch p
-rewriteMismatch f (ValueSpecMismatch v prims) = f (ValueSpecMismatch v (fmap aux1 prims))
+rewriteMismatch f (ValueSpecMismatch p v prims) = f (ValueSpecMismatch p v (fmap aux1 prims))
   where
     aux1 (PrimMismatch spec prob) = PrimMismatch spec (aux2 prob)
 
@@ -112,21 +112,31 @@ rewriteMismatch f (ValueSpecMismatch v prims) = f (ValueSpecMismatch v (fmap aux
     aux2 (NestedProblem        y) = NestedProblem        (rewriteMismatch f y)
     aux2 prob                     = prob
 
+
 -- | Single-step rewrite that removes type-mismatch problems if there
 -- are non-mismatches available to focus on.
 removeTypeMismatch1 :: ValueSpecMismatch p -> ValueSpecMismatch p
-removeTypeMismatch1 (ValueSpecMismatch v xs)
-  | Just xs' <- NonEmpty.nonEmpty (NonEmpty.filter isNotTypeMismatch xs)
-  = ValueSpecMismatch v xs'
-  where
-    isNotTypeMismatch (PrimMismatch _ TypeMismatch) = False
-    isNotTypeMismatch _                             = True
+removeTypeMismatch1 (ValueSpecMismatch p v xs)
+  | Just xs' <- NonEmpty.nonEmpty (NonEmpty.filter (not . isTypeMismatch) xs)
+  = ValueSpecMismatch p v xs'
 removeTypeMismatch1 v = v
+
+isTypeMismatch :: PrimMismatch p -> Bool
+isTypeMismatch (PrimMismatch _ prob) =
+  case prob of
+    WrongAtom -> True
+    TypeMismatch -> True
+    NestedProblem x -> go x
+    SubkeyProblem _ x -> go x
+    ListElementProblem _ x -> go x
+    _ -> False
+  where
+    go (ValueSpecMismatch _ _ xs) = all isTypeMismatch xs
 
 -- | Single-step rewrite that removes mismatches with only a single,
 -- nested mismatch below them.
 focusMismatch1 :: ValueSpecMismatch p -> ValueSpecMismatch p
-focusMismatch1 x@(ValueSpecMismatch _ prims)
+focusMismatch1 x@(ValueSpecMismatch _ _ prims)
   | PrimMismatch _ problem :| [] <- prims
   , Just sub <- simplify1 problem = sub
   | otherwise = x
@@ -141,10 +151,10 @@ focusMismatch1 x@(ValueSpecMismatch _ prims)
 -- and type of value that failed to match along with details about
 -- each specification that it didn't match.
 prettyValueSpecMismatch :: ErrorAnnotation p => ValueSpecMismatch p -> Doc
-prettyValueSpecMismatch (ValueSpecMismatch v es) =
+prettyValueSpecMismatch (ValueSpecMismatch p v es) =
   heading $+$ errors
   where
-    heading = displayAnnotation (valueAnn v) <> text (describeValue v)
+    heading = displayAnnotation p <> text (Text.unpack v)
     errors = vcat (map prettyPrimMismatch (toList es))
 
 
