@@ -12,7 +12,7 @@ This module defines the syntax of value specifications.
 Specifications can be defined using "Config.Schema.Spec" and can be consumed
 with "Config.Schema.Load" and "Config.Schema.Doc".
 
-This module defines high-level 'ValueSpec' and 'SectionsSpec' types that are
+This module defines high-level 'ValueSpec' and @SectionsSpec@ types that are
 intended to be used by normal library users. This types are implemented in
 terms of primitive 'PrimValueSpec' and 'PrimSectionSpec' types. These
 primitives are what consumers of specifications will need to use.
@@ -93,6 +93,8 @@ data PrimValueSpec :: * -> * where
 -- way to specify expected values.
 --
 -- Multiple specifications can be combined using this type's 'Alt' instance.
+--
+-- To create 'ValueSpec' values see "Config.Schema.Spec"
 newtype ValueSpec a = MkValueSpec
   { unValueSpec :: NonEmpty (Coyoneda PrimValueSpec a) }
   deriving (Functor)
@@ -151,6 +153,8 @@ data PrimSectionSpec :: * -> * where
 -- | A list of section specifications used to process a whole group of
 -- key-value pairs. Multiple section specifications can be combined
 -- using this type's 'Applicative' instance.
+--
+-- To create @SectionsSpec@ values see "Config.Schema.Spec"
 newtype SectionsSpec a = MkSectionsSpec (Ap PrimSectionSpec a)
   deriving (Functor, Applicative)
 
@@ -162,7 +166,7 @@ primSectionsSpec :: PrimSectionSpec a -> SectionsSpec a
 primSectionsSpec = MkSectionsSpec . liftAp
 
 -- | Given an function that handles a single, primitive section specification;
--- 'runSections' will generate one that processes a whole 'SectionsSpec'.
+-- 'runSections' will generate one that processes a whole @SectionsSpec@.
 --
 -- The results from each section will be sequence together using the 'Applicative'
 -- instance in of the result type, and the results can be indexed by the type
@@ -174,7 +178,7 @@ runSections f (MkSectionsSpec s) = runAp f s
 
 
 -- | Given an function that handles a single, primitive section specification;
--- 'runSections_' will generate one that processes a whole 'SectionsSpec'.
+-- 'runSections_' will generate one that processes a whole @SectionsSpec@.
 --
 -- The results from each section will be sequence together using the 'Monoid'
 -- instance in of the result type, and the results will not be indexed by the
