@@ -1,8 +1,11 @@
 # Revision history for config-schema
 
-## 1.1.0.1
+## 1.2.0.0
 
 * Update to build against `config-value-0.7.0.0`
+* Added `numberSpec`, `rationalSpec`, `integerSpec`, `textSpec`
+* Primitive number spec now only matches `Number`, previous
+  `IntegerSpec` is now derived in terms of `NumberSpec`
 
 ## 1.1.0.0
 

@@ -31,7 +31,6 @@ import           Data.Text                        (Text)
 import qualified Data.Text.IO as Text
 
 import           Config
-import           Config.Number (numberToInteger, numberToRational)
 import           Config.Schema.Types
 import           Config.Schema.Load.Error
 
@@ -98,8 +97,7 @@ getValue1 v prim = withExcept (pure . PrimMismatch (describeSpec prim))
 -- | Match a primitive value specification against a single value.
 getValue2 :: Value p -> PrimValueSpec a -> Except (Problem p) a
 getValue2 (Text _ t)       TextSpec           = pure t
-getValue2 (Number _ n)     IntegerSpec | Just i <- numberToInteger n = pure i
-getValue2 (Number _ n)     RationalSpec       = pure (numberToRational n)
+getValue2 (Number _ n)     NumberSpec         = pure n
 getValue2 (List _ xs)      (ListSpec w)       = getList w xs
 getValue2 (Atom _ b)       AnyAtomSpec        = pure (atomName b)
 getValue2 (Atom _ b)       (AtomSpec a)

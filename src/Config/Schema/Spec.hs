@@ -30,6 +30,10 @@ module Config.Schema.Spec
   , listSpec
   , customSpec
   , namedSpec
+  , numberSpec
+  , integerSpec
+  , rationalSpec
+  , textSpec
   , HasSpec(..)
 
   -- * Specifying sections
@@ -61,6 +65,7 @@ import qualified Data.Text as Text
 import           Data.Word
 
 import           Config.Schema.Types
+import           Config.Number (Number, numberToInteger, numberToRational)
 
 ------------------------------------------------------------------------
 -- 'ValueSpec' builders
@@ -141,9 +146,9 @@ import           Config.Schema.Types
 
 -- | Class of value specifications that don't require arguments.
 class    HasSpec a        where anySpec :: ValueSpec a
-instance HasSpec Text     where anySpec = primValueSpec TextSpec
-instance HasSpec Integer  where anySpec = primValueSpec IntegerSpec
-instance HasSpec Rational where anySpec = primValueSpec RationalSpec
+instance HasSpec Text     where anySpec = textSpec
+instance HasSpec Integer  where anySpec = integerSpec
+instance HasSpec Rational where anySpec = rationalSpec
 instance HasSpec Int      where anySpec = sizedBitsSpec "machine-bit signed"
 instance HasSpec Int8     where anySpec = sizedBitsSpec "8-bit signed"
 instance HasSpec Int16    where anySpec = sizedBitsSpec "16-bit signed"
@@ -162,7 +167,7 @@ instance (HasSpec a, HasSpec b) => HasSpec (Either a b) where
   anySpec = Left <$> anySpec <!> Right <$> anySpec
 
 sizedBitsSpec :: (Integral a, Bits a) => Text -> ValueSpec a
-sizedBitsSpec name = customSpec name (primValueSpec IntegerSpec) check
+sizedBitsSpec name = customSpec name integerSpec check
   where
     check i = case toIntegralSized i of
                 Nothing -> Left "out of bounds"
@@ -184,11 +189,40 @@ stringSpec = Text.unpack <$> anySpec
 numSpec :: Num a => ValueSpec a
 numSpec = fromInteger <$> anySpec
 
+-- | Specification for matching any text literal
+--
+-- @since 0.2.0.0
+textSpec :: ValueSpec Text
+textSpec = primValueSpec TextSpec
+
 -- | Specification for matching any fractional number.
 --
 -- @since 0.2.0.0
 fractionalSpec :: Fractional a => ValueSpec a
 fractionalSpec = fromRational <$> anySpec
+
+-- | Specification for matching any fractional number.
+--
+-- @since 1.2.0.0
+numberSpec :: ValueSpec Number
+numberSpec = primValueSpec NumberSpec
+
+-- | Specification for matching any integral number.
+--
+-- @since 1.2.0.0
+integerSpec :: ValueSpec Integer
+integerSpec = customSpec "integral" numberSpec check
+  where
+    check n =
+      case numberToInteger n of
+        Nothing -> Left "fractional number"
+        Just i  -> Right i
+
+-- | Specification for matching any number as a 'Rational'.
+--
+-- @since 1.2.0.0
+rationalSpec :: ValueSpec Rational
+rationalSpec = numberToRational <$> numberSpec
 
 -- | Specification for matching a list of values each satisfying a
 -- given element specification.

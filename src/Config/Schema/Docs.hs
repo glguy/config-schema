@@ -126,8 +126,7 @@ valueDoc :: PrimValueSpec a -> DocBuilder Doc
 valueDoc w =
   case w of
     TextSpec         -> pure "text"
-    IntegerSpec      -> pure "integer"
-    RationalSpec     -> pure "number"
+    NumberSpec       -> pure "number"
     AtomSpec a       -> pure ("`" <> txt a <> "`")
     AnyAtomSpec      -> pure "atom"
     SectionsSpec l s -> sectionsDoc l s

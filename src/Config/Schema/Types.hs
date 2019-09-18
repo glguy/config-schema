@@ -36,6 +36,7 @@ module Config.Schema.Types
 
   ) where
 
+import           Config.Number            (Number)
 import           Control.Applicative      (Const(..))
 import           Control.Applicative.Free (Ap, liftAp, runAp, runAp_)
 import           Data.Functor.Alt         (Alt(..))
@@ -58,11 +59,8 @@ data PrimValueSpec :: * -> * where
   -- | Matches any string literal
   TextSpec :: PrimValueSpec Text
 
-  -- | Matches integral numbers
-  IntegerSpec :: PrimValueSpec Integer
-
-  -- | Matches any number
-  RationalSpec :: PrimValueSpec Rational
+  -- | Matches numbers
+  NumberSpec :: PrimValueSpec Number
 
   -- | Matches any atom
   AnyAtomSpec :: PrimValueSpec Text

@@ -80,8 +80,7 @@ data Problem p
 -- | Describe outermost shape of a 'PrimValueSpec'
 describeSpec :: PrimValueSpec a -> Text
 describeSpec TextSpec                   = "text"
-describeSpec IntegerSpec                = "integer"
-describeSpec RationalSpec               = "number"
+describeSpec NumberSpec                 = "number"
 describeSpec AnyAtomSpec                = "atom"
 describeSpec (AtomSpec a)               = "atom `" <> a <> "`"
 describeSpec (ListSpec _)               = "list"
