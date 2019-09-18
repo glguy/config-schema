@@ -1,5 +1,9 @@
 # Revision history for config-schema
 
+## 1.1.0.1
+
+* Update to build against `config-value-0.7.0.0`
+
 ## 1.1.0.0
 
 * Simplify field types of `ValueSpecMismatch`

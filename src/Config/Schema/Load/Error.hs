@@ -93,8 +93,7 @@ describeSpec (NamedSpec name _)         = name
 -- | Describe outermost shape of a 'Value'
 describeValue :: Value p -> Text
 describeValue Text{}     = "text"
-describeValue Number{}   = "integer"
-describeValue Floating{} = "number"
+describeValue Number{}   = "number"
 describeValue (Atom _ a) = "atom `" <> atomName a <> "`"
 describeValue Sections{} = "sections"
 describeValue List{}     = "list"
