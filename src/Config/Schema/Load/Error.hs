@@ -1,4 +1,4 @@
-{-# Language GADTs, OverloadedStrings #-}
+{-# Language GADTs, OverloadedStrings, CPP #-}
 {-|
 Module      : Config.Schema.Load.Error
 Description : Error types and rendering for Load module
@@ -45,10 +45,13 @@ import           Data.Typeable (Typeable)
 import           Text.PrettyPrint
                     (Doc, fsep, ($+$), nest, text, vcat, (<+>), empty,
                      punctuate, comma, int, colon, hcat)
-import           Data.Monoid ((<>))
 
 import           Config
 import           Config.Schema.Types
+
+#if !MIN_VERSION_base(4,11,0)
+import           Data.Monoid ((<>))
+#endif
 
 -- | Newtype wrapper for schema load errors.
 data ValueSpecMismatch p =

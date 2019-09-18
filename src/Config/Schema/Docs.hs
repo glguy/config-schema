@@ -1,4 +1,4 @@
-{-# Language RecursiveDo, OverloadedStrings, GADTs, GeneralizedNewtypeDeriving #-}
+{-# Language RecursiveDo, OverloadedStrings, GADTs, GeneralizedNewtypeDeriving, CPP #-}
 
 {-|
 Module      : Config.Schema.Docs
@@ -42,7 +42,6 @@ import           Control.Monad.Trans.State.Strict (runState, get, put, State)
 import           Data.List (intersperse)
 import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Map (Map)
-import           Data.Monoid (Monoid(..))
 import qualified Data.Map as Map
 import qualified Data.Semigroup as S
 import           Data.Text (Text)
@@ -50,6 +49,10 @@ import qualified Data.Text as Text
 import           Text.PrettyPrint
                     (Doc, fsep, text, (<>), ($+$), (<+>), nest, empty, hsep, parens)
 import           Prelude hiding ((<>))
+
+#if !MIN_VERSION_base(4,11,0)
+import           Data.Monoid (Monoid(..))
+#endif
 
 import           Config.Schema.Spec
 import           Config.Schema.Types
