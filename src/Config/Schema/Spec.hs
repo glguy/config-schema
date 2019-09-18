@@ -1,4 +1,4 @@
-{-# Language FlexibleInstances, OverloadedStrings #-}
+{-# Language ScopedTypeVariables, OverloadedStrings #-}
 
 {-|
 Module      : Config.Schema.Spec
@@ -32,6 +32,7 @@ module Config.Schema.Spec
   , namedSpec
   , numberSpec
   , integerSpec
+  , naturalSpec
   , rationalSpec
   , textSpec
   , HasSpec(..)
@@ -47,6 +48,7 @@ module Config.Schema.Spec
   -- * Derived specifications
   , oneOrList
   , yesOrNoSpec
+  , trueOrFalseSpec
   , stringSpec
   , numSpec
   , fractionalSpec
@@ -55,7 +57,7 @@ module Config.Schema.Spec
 
   ) where
 
-import           Data.Bits                        (Bits, toIntegralSized)
+import           Data.Bits                        (FiniteBits, isSigned, toIntegralSized, finiteBitSize)
 import           Data.Functor.Alt                 (Alt(..))
 import           Data.Int
 import           Data.List.NonEmpty               (NonEmpty)
@@ -63,6 +65,8 @@ import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Text                        (Text)
 import qualified Data.Text as Text
 import           Data.Word
+import           Data.Ratio
+import           GHC.Natural                      (Natural)
 
 import           Config.Schema.Types
 import           Config.Number (Number, numberToInteger, numberToRational)
@@ -144,34 +148,71 @@ import           Config.Number (Number, numberToInteger, numberToRational)
 -- > username: random
 -- > -- Generates: Config { userName = Random, retries = 5 }
 
--- | Class of value specifications that don't require arguments.
+-- | Class of value specifications without parameters.
 class    HasSpec a        where anySpec :: ValueSpec a
 instance HasSpec Text     where anySpec = textSpec
 instance HasSpec Integer  where anySpec = integerSpec
-instance HasSpec Rational where anySpec = rationalSpec
-instance HasSpec Int      where anySpec = sizedBitsSpec "machine-bit signed"
-instance HasSpec Int8     where anySpec = sizedBitsSpec "8-bit signed"
-instance HasSpec Int16    where anySpec = sizedBitsSpec "16-bit signed"
-instance HasSpec Int32    where anySpec = sizedBitsSpec "32-bit signed"
-instance HasSpec Int64    where anySpec = sizedBitsSpec "64-bit signed"
-instance HasSpec Word     where anySpec = sizedBitsSpec "machine-bit unsigned"
-instance HasSpec Word8    where anySpec = sizedBitsSpec "8-bit unsigned"
-instance HasSpec Word16   where anySpec = sizedBitsSpec "16-bit unsigned"
-instance HasSpec Word32   where anySpec = sizedBitsSpec "32-bit unsigned"
-instance HasSpec Word64   where anySpec = sizedBitsSpec "64-bit unsigned"
+instance HasSpec Int      where anySpec = sizedBitsSpec
+instance HasSpec Int8     where anySpec = sizedBitsSpec
+instance HasSpec Int16    where anySpec = sizedBitsSpec
+instance HasSpec Int32    where anySpec = sizedBitsSpec
+instance HasSpec Int64    where anySpec = sizedBitsSpec
+instance HasSpec Word     where anySpec = sizedBitsSpec
+instance HasSpec Word8    where anySpec = sizedBitsSpec
+instance HasSpec Word16   where anySpec = sizedBitsSpec
+instance HasSpec Word32   where anySpec = sizedBitsSpec
+instance HasSpec Word64   where anySpec = sizedBitsSpec
 
+-- | @since 1.2.0.0
+instance HasSpec Natural  where anySpec = naturalSpec
+
+-- | @since 1.2.0.0
+instance HasSpec Double   where anySpec = fractionalSpec
+
+-- | @since 1.2.0.0
+instance HasSpec Float    where anySpec = fractionalSpec
+
+-- | For 'Ratio' and 'Rational'
+--
+-- @since 1.2.0.0
+instance Integral a => HasSpec (Ratio a) where
+  anySpec = fractionalSpec
+
+-- | Zero or more elements in a list
 instance HasSpec a => HasSpec [a] where
-  anySpec = primValueSpec (ListSpec anySpec)
+  anySpec = listSpec anySpec
 
+-- | One or more elements in a list
+--
+-- @since 1.2.0.0
+instance HasSpec a => HasSpec (NonEmpty a) where
+  anySpec = nonemptySpec anySpec
+
+-- | Left-biased, untagged union of specs
 instance (HasSpec a, HasSpec b) => HasSpec (Either a b) where
   anySpec = Left <$> anySpec <!> Right <$> anySpec
 
-sizedBitsSpec :: (Integral a, Bits a) => Text -> ValueSpec a
-sizedBitsSpec name = customSpec name integerSpec check
+{-# INLINE sizedBitsSpec #-}
+sizedBitsSpec :: forall a. (Integral a, FiniteBits a) => ValueSpec a
+sizedBitsSpec = customSpec label integerSpec check
   where
+    signText = if isSigned (0::a) then "signed" else "unsigned"
+
+    label = Text.pack (show (finiteBitSize (0::a)) ++ "-bit " ++ signText)
+
     check i = case toIntegralSized i of
                 Nothing -> Left "out of bounds"
                 Just j  -> Right j
+
+-- | Specification for matching any non-negative, integral number
+--
+-- @since 1.2.0.0
+naturalSpec :: ValueSpec Natural
+naturalSpec = customSpec "non-negative" integerSpec check
+  where
+    check i
+      | i < 0     = Left "negative number"
+      | otherwise = Right (fromInteger i)
 
 -- | Specification for matching a particular atom.
 atomSpec :: Text -> ValueSpec ()
@@ -183,15 +224,15 @@ anyAtomSpec = primValueSpec AnyAtomSpec
 
 -- | Specification for matching any text as a 'String'
 stringSpec :: ValueSpec String
-stringSpec = Text.unpack <$> anySpec
+stringSpec = Text.unpack <$> textSpec
 
 -- | Specification for matching any integral number.
 numSpec :: Num a => ValueSpec a
-numSpec = fromInteger <$> anySpec
+numSpec = fromInteger <$> integerSpec
 
 -- | Specification for matching any text literal
 --
--- @since 0.2.0.0
+-- @since 1.2.0.0
 textSpec :: ValueSpec Text
 textSpec = primValueSpec TextSpec
 
@@ -199,7 +240,7 @@ textSpec = primValueSpec TextSpec
 --
 -- @since 0.2.0.0
 fractionalSpec :: Fractional a => ValueSpec a
-fractionalSpec = fromRational <$> anySpec
+fractionalSpec = fromRational <$> rationalSpec
 
 -- | Specification for matching any fractional number.
 --
@@ -275,12 +316,17 @@ customSpec :: Text -> ValueSpec a -> (a -> Either Text b) -> ValueSpec b
 customSpec lbl w f = primValueSpec (CustomSpec lbl (f <$> w))
 
 
--- | Specification for using @yes@ and @no@ to represent booleans 'True'
+-- | Specification for using atoms @yes@ and @no@ to represent booleans 'True'
 -- and 'False' respectively
 yesOrNoSpec :: ValueSpec Bool
-yesOrNoSpec = True  <$ atomSpec (Text.pack "yes")
-          <!> False <$ atomSpec (Text.pack "no")
+yesOrNoSpec = True <$ atomSpec "yes" <!> False <$ atomSpec "no"
 
+-- | Specification for using atoms @true@ and @false@ to represent booleans 'True'
+-- and 'False' respectively.
+--
+-- @since 1.2.0.0
+trueOrFalseSpec :: ValueSpec Bool
+trueOrFalseSpec = True <$ atomSpec "true" <!> False <$ atomSpec "false"
 
 -- | Matches a non-empty list.
 --
