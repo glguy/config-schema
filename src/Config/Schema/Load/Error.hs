@@ -33,6 +33,7 @@ module Config.Schema.Load.Error
   -- * Summaries
   , describeSpec
   , describeValue
+  , simplifyMismatch
   ) where
 
 import           Control.Exception
@@ -125,12 +126,10 @@ removeTypeMismatch1 v = v
 isTypeMismatch :: PrimMismatch p -> Bool
 isTypeMismatch (PrimMismatch _ prob) =
   case prob of
-    WrongAtom -> True
-    TypeMismatch -> True
+    WrongAtom       -> True
+    TypeMismatch    -> True
     NestedProblem x -> go x
-    SubkeyProblem _ x -> go x
-    ListElementProblem _ x -> go x
-    _ -> False
+    _               -> False
   where
     go (ValueSpecMismatch _ _ xs) = all isTypeMismatch xs
 
@@ -166,7 +165,10 @@ prettyPrimMismatch :: ErrorAnnotation p => PrimMismatch p -> Doc
 prettyPrimMismatch (PrimMismatch spec problem) =
   case prettyProblem problem of
     (summary, detail) ->
-      (text "*" <+> text (Text.unpack spec) <+> summary) $+$ nest 4 detail
+      (text "* expected" <+> text (Text.unpack spec) <+> summary) $+$ nest 4 detail
+
+simplifyMismatch :: ValueSpecMismatch p -> ValueSpecMismatch p
+simplifyMismatch = rewriteMismatch (focusMismatch1 . removeTypeMismatch1)
 
 -- | Pretty-printer for 'Problem' that generates a summary line
 -- as well as a detailed description (depending on the error)
@@ -216,4 +218,4 @@ instance ErrorAnnotation () where
 
 -- | 'displayException' implemented with 'prettyValueSpecMismatch'
 instance ErrorAnnotation p => Exception (ValueSpecMismatch p) where
-  displayException = show . prettyValueSpecMismatch . rewriteMismatch (focusMismatch1 . removeTypeMismatch1)
+  displayException = show . prettyValueSpecMismatch . simplifyMismatch
