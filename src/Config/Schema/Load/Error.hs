@@ -140,8 +140,6 @@ isTypeMismatch (PrimMismatch _ prob) =
     TypeMismatch                             -> True
     NestedProblem (ValueSpecMismatch _ _ xs) -> all isTypeMismatch xs
     _                                        -> False
-  where
-    go (ValueSpecMismatch _ _ xs) = 
 
 -- | Single-step rewrite that removes mismatches with only a single,
 -- nested mismatch below them.
