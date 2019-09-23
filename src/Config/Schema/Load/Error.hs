@@ -33,7 +33,7 @@ module Config.Schema.Load.Error
   -- * Summaries
   , describeSpec
   , describeValue
-  , simplifyMismatch
+  , simplifyValueSpecMismatch
   ) where
 
 import           Control.Exception
@@ -55,6 +55,8 @@ import           Data.Monoid ((<>))
 #endif
 
 -- | Newtype wrapper for schema load errors.
+--
+-- @since 1.2.0.0
 data ValueSpecMismatch p =
   -- | Problem value and list of specification failures
   ValueSpecMismatch p Text (NonEmpty (PrimMismatch p))
@@ -63,6 +65,8 @@ data ValueSpecMismatch p =
 -- | Type for errors that can be encountered while decoding a value according
 -- to a specification. The error includes a key path indicating where in
 -- the configuration file the error occurred.
+--
+-- @since 1.2.0.0
 data PrimMismatch p =
   -- | spec description and problem
   PrimMismatch Text (Problem p)
@@ -70,6 +74,8 @@ data PrimMismatch p =
 
 
 -- | Problems that can be encountered when matching a 'Value' against a 'ValueSpec'.
+--
+-- @since 1.2.0.0
 data Problem p
   = MissingSection Text                          -- ^ missing section name
   | UnusedSections (NonEmpty Text)               -- ^ unused section names
@@ -82,6 +88,8 @@ data Problem p
   deriving Show
 
 -- | Describe outermost shape of a 'PrimValueSpec'
+--
+-- @since 1.2.0.0
 describeSpec :: PrimValueSpec a -> Text
 describeSpec TextSpec                   = "text"
 describeSpec NumberSpec                 = "number"
@@ -123,15 +131,17 @@ removeTypeMismatch1 (ValueSpecMismatch p v xs)
   = ValueSpecMismatch p v xs'
 removeTypeMismatch1 v = v
 
+-- | Returns 'True' for schema mismatches where the value type doesn't
+-- match.
 isTypeMismatch :: PrimMismatch p -> Bool
 isTypeMismatch (PrimMismatch _ prob) =
   case prob of
-    WrongAtom       -> True
-    TypeMismatch    -> True
-    NestedProblem x -> go x
-    _               -> False
+    WrongAtom                                -> True
+    TypeMismatch                             -> True
+    NestedProblem (ValueSpecMismatch _ _ xs) -> all isTypeMismatch xs
+    _                                        -> False
   where
-    go (ValueSpecMismatch _ _ xs) = all isTypeMismatch xs
+    go (ValueSpecMismatch _ _ xs) = 
 
 -- | Single-step rewrite that removes mismatches with only a single,
 -- nested mismatch below them.
@@ -150,6 +160,8 @@ focusMismatch1 x@(ValueSpecMismatch _ _ prims)
 -- | Pretty-printer for 'ValueSpecMismatch' showing the position
 -- and type of value that failed to match along with details about
 -- each specification that it didn't match.
+--
+-- @since 1.2.0.0
 prettyValueSpecMismatch :: ErrorAnnotation p => ValueSpecMismatch p -> Doc
 prettyValueSpecMismatch (ValueSpecMismatch p v es) =
   heading $+$ errors
@@ -161,17 +173,27 @@ prettyValueSpecMismatch (ValueSpecMismatch p v es) =
 -- | Pretty-printer for 'PrimMismatch' showing a summary of the primitive
 -- specification that didn't match followed by a more detailed error when
 -- appropriate.
+--
+-- @since 1.2.0.0
 prettyPrimMismatch :: ErrorAnnotation p => PrimMismatch p -> Doc
 prettyPrimMismatch (PrimMismatch spec problem) =
   case prettyProblem problem of
     (summary, detail) ->
       (text "* expected" <+> text (Text.unpack spec) <+> summary) $+$ nest 4 detail
 
-simplifyMismatch :: ValueSpecMismatch p -> ValueSpecMismatch p
-simplifyMismatch = rewriteMismatch (focusMismatch1 . removeTypeMismatch1)
+-- | Simplify a 'ValueSpecMismatch' by collapsing long nested error
+-- cases and by assuming that if a type matched that the other mismatched
+-- type alternatives are uninteresting. This is used in the implementation
+-- of 'displayException'.
+--
+-- @since 1.2.1.0
+simplifyValueSpecMismatch :: ValueSpecMismatch p -> ValueSpecMismatch p
+simplifyValueSpecMismatch = rewriteMismatch (focusMismatch1 . removeTypeMismatch1)
 
 -- | Pretty-printer for 'Problem' that generates a summary line
 -- as well as a detailed description (depending on the error)
+--
+-- @since 1.2.0.0
 prettyProblem ::
   ErrorAnnotation p =>
   Problem p ->
@@ -205,17 +227,26 @@ prettyProblem p =
       , prettyValueSpecMismatch e)
 
 -- | Class for rendering position annotations within the 'prettyValueSpecMismatch'
+--
+-- @since 1.2.0.0
 class (Typeable a, Show a) => ErrorAnnotation a where
   displayAnnotation :: a -> Doc
 
 -- | Renders a 'Position' as @line:column:@
+--
+-- @since 1.2.0.0
 instance ErrorAnnotation Position where
   displayAnnotation pos = hcat [int (posLine pos), colon, int (posColumn pos), colon]
 
 -- | Renders as an empty document
+--
+-- @since 1.2.0.0
 instance ErrorAnnotation () where
   displayAnnotation _ = empty
 
 -- | 'displayException' implemented with 'prettyValueSpecMismatch'
+-- and 'simplifyValueSpecMismatch'.
+--
+-- @since 1.2.0.0
 instance ErrorAnnotation p => Exception (ValueSpecMismatch p) where
-  displayException = show . prettyValueSpecMismatch . simplifyMismatch
+  displayException = show . prettyValueSpecMismatch . simplifyValueSpecMismatch

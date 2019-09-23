@@ -1,5 +1,10 @@
 # Revision history for config-schema
 
+## 1.2.1.0
+
+* Expose `Config.Schema.Load.Error.simplifyValueSpecMismatch`
+  for providing more focused error feedback.
+
 ## 1.2.0.0
 
 * Update to build against `config-value-0.7.0.0`
