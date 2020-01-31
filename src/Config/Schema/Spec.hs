@@ -15,45 +15,60 @@ and "Config.Schema.Docs".
 
 This is the schema system used by the @glirc@ IRC client
 <https://hackage.haskell.org/package/glirc>. For a significant example,
-visit the "Client.Configuration" and "Client.Configuration.Colors" modules.
+visit the @Client.Configuration@ and @Client.Configuration.Colors@ modules.
 
 -}
 module Config.Schema.Spec
   (
   -- * Specifying values
   -- $values
+
     ValueSpec
-  , sectionsSpec
-  , assocSpec
-  , atomSpec
-  , anyAtomSpec
-  , listSpec
   , customSpec
   , namedSpec
-  , numberSpec
-  , integerSpec
-  , naturalSpec
-  , rationalSpec
-  , textSpec
   , HasSpec(..)
 
-  -- * Specifying sections
+  -- ** Key-value mapping specifications
   -- $sections
+  , sectionsSpec
+  , assocSpec
+
+  -- ** Number specifications
+  -- $number
+  , numberSpec
+  , integerSpec
+  , rationalSpec
+  , naturalSpec
+  , fractionalSpec
+  , numSpec
+
+  -- ** Text specifications
+  -- $text
+  , textSpec
+  , stringSpec
+
+  -- ** Atom specifications
+  -- $atom
+  , atomSpec
+  , anyAtomSpec
+  , yesOrNoSpec
+  , trueOrFalseSpec
+
+  -- ** List specifications
+  -- $list
+  , listSpec
+  , oneOrList
+  , nonemptySpec
+  , oneOrNonemptySpec
+
+
+  -- * Specifying sections
+  -- $sectionsspec
   , SectionsSpec
   , reqSection
   , optSection
   , reqSection'
   , optSection'
-
-  -- * Derived specifications
-  , oneOrList
-  , yesOrNoSpec
-  , trueOrFalseSpec
-  , stringSpec
-  , numSpec
-  , fractionalSpec
-  , nonemptySpec
-  , oneOrNonemptySpec
 
   ) where
 
@@ -192,6 +207,58 @@ instance HasSpec a => HasSpec (NonEmpty a) where
 instance (HasSpec a, HasSpec b) => HasSpec (Either a b) where
   anySpec = Left <$> anySpec <!> Right <$> anySpec
 
+-- | Named value specification. This is useful for factoring complicated
+-- value specifications out in the documentation to avoid repetition of
+-- complex specifications.
+namedSpec ::
+  Text        {- ^ name                     -} ->
+  ValueSpec a {- ^ underlying specification -} ->
+  ValueSpec a
+namedSpec n s = primValueSpec (NamedSpec n s)
+
+
+-- | The custom specification allows an arbitrary function to be used
+-- to validate the value extracted by a specification. If 'Nothing'
+-- is returned the value is considered to have failed validation.
+customSpec :: Text -> ValueSpec a -> (a -> Either Text b) -> ValueSpec b
+customSpec lbl w f = primValueSpec (CustomSpec lbl (f <$> w))
+
+------------------------------------------------------------------------
+
+-- $sections
+-- Specifications that match key-value map literals.
+
+-- | Named subsection value specification. The unique identifier will be used
+-- for generating a documentation section for this specification and should
+-- be unique within the scope of the specification being built.
+sectionsSpec ::
+  Text           {- ^ unique documentation identifier -} ->
+  SectionsSpec a {- ^ underlying specification        -} ->
+  ValueSpec a
+sectionsSpec i s = primValueSpec (SectionsSpec i s)
+
+
+-- | Specification for a section list where the keys are user-defined.
+-- Values are matched against the underlying specification and returned
+-- as a list of section-name\/value pairs.
+--
+-- @since 0.3.0.0
+assocSpec ::
+  ValueSpec a {- ^ underlying specification -} ->
+  ValueSpec [(Text,a)]
+assocSpec = primValueSpec . AssocSpec
+
+------------------------------------------------------------------------
+
+-- $number
+-- Specifications built from 'numberSpec' matching number literals.
+
+-- | Primitive specification for matching any number.
+--
+-- @since 1.2.0.0
+numberSpec :: ValueSpec Number
+numberSpec = primValueSpec NumberSpec
+
 {-# INLINE sizedBitsSpec #-}
 sizedBitsSpec :: forall a. (Integral a, FiniteBits a) => ValueSpec a
 sizedBitsSpec = customSpec label integerSpec check
@@ -214,39 +281,15 @@ naturalSpec = customSpec "non-negative" integerSpec check
       | i < 0     = Left "negative number"
       | otherwise = Right (fromInteger i)
 
--- | Specification for matching a particular atom.
-atomSpec :: Text -> ValueSpec ()
-atomSpec = primValueSpec . AtomSpec
-
--- | Specification for matching any atom. Matched atom is returned.
-anyAtomSpec :: ValueSpec Text
-anyAtomSpec = primValueSpec AnyAtomSpec
-
--- | Specification for matching any text as a 'String'
-stringSpec :: ValueSpec String
-stringSpec = Text.unpack <$> textSpec
-
 -- | Specification for matching any integral number.
 numSpec :: Num a => ValueSpec a
 numSpec = fromInteger <$> integerSpec
-
--- | Specification for matching any text literal
---
--- @since 1.2.0.0
-textSpec :: ValueSpec Text
-textSpec = primValueSpec TextSpec
 
 -- | Specification for matching any fractional number.
 --
 -- @since 0.2.0.0
 fractionalSpec :: Fractional a => ValueSpec a
 fractionalSpec = fromRational <$> rationalSpec
-
--- | Specification for matching any fractional number.
---
--- @since 1.2.0.0
-numberSpec :: ValueSpec Number
-numberSpec = primValueSpec NumberSpec
 
 -- | Specification for matching any integral number.
 --
@@ -265,56 +308,20 @@ integerSpec = customSpec "integral" numberSpec check
 rationalSpec :: ValueSpec Rational
 rationalSpec = numberToRational <$> numberSpec
 
--- | Specification for matching a list of values each satisfying a
--- given element specification.
-listSpec :: ValueSpec a -> ValueSpec [a]
-listSpec = primValueSpec . ListSpec
+------------------------------------------------------------------------
 
+-- $atom
+-- Specifications built to match atoms.
 
--- | Named subsection value specification. The unique identifier will be used
--- for generating a documentation section for this specification and should
--- be unique within the scope of the specification being built.
-sectionsSpec ::
-  Text           {- ^ unique documentation identifier -} ->
-  SectionsSpec a {- ^ underlying specification        -} ->
-  ValueSpec a
-sectionsSpec i s = primValueSpec (SectionsSpec i s)
+-- | Primitive specification for matching a particular atom.
+atomSpec ::
+  Text {- ^ atom -} ->
+  ValueSpec ()
+atomSpec = primValueSpec . AtomSpec
 
-
--- | Specification for a section list where the keys are user-defined.
--- Values are matched against the underlying specification and returned
--- as a list of section-name\/value pairs.
---
--- @since 0.3.0.0
-assocSpec ::
-  ValueSpec a {- ^ underlying specification -} ->
-  ValueSpec [(Text,a)]
-assocSpec = primValueSpec . AssocSpec
-
-
--- | Named value specification. This is useful for factoring complicated
--- value specifications out in the documentation to avoid repetition of
--- complex specifications.
-namedSpec ::
-  Text         {- ^ name                     -} ->
-  ValueSpec a {- ^ underlying specification -} ->
-  ValueSpec a
-namedSpec n s = primValueSpec (NamedSpec n s)
-
-
--- | Specification that matches either a single element or multiple
--- elements in a list. This can be convenient for allowing the user
--- to avoid having to specify singleton lists in the configuration file.
-oneOrList :: ValueSpec a -> ValueSpec [a]
-oneOrList s = pure <$> s <!> listSpec s
-
-
--- | The custom specification allows an arbitrary function to be used
--- to validate the value extracted by a specification. If 'Nothing'
--- is returned the value is considered to have failed validation.
-customSpec :: Text -> ValueSpec a -> (a -> Either Text b) -> ValueSpec b
-customSpec lbl w f = primValueSpec (CustomSpec lbl (f <$> w))
-
+-- | Primitive specification for matching any atom. Matched atom is returned.
+anyAtomSpec :: ValueSpec Text
+anyAtomSpec = primValueSpec AnyAtomSpec
 
 -- | Specification for using atoms @yes@ and @no@ to represent booleans 'True'
 -- and 'False' respectively
@@ -328,10 +335,39 @@ yesOrNoSpec = True <$ atomSpec "yes" <!> False <$ atomSpec "no"
 trueOrFalseSpec :: ValueSpec Bool
 trueOrFalseSpec = True <$ atomSpec "true" <!> False <$ atomSpec "false"
 
+------------------------------------------------------------------------
+
+-- $text
+-- Specifications built from 'textSpec' for matching string literals.
+
+-- | Specification for matching any text literal
+--
+-- @since 1.2.0.0
+textSpec :: ValueSpec Text
+textSpec = primValueSpec TextSpec
+
+-- | Specification for matching any text as a 'String'
+stringSpec :: ValueSpec String
+stringSpec = Text.unpack <$> textSpec
+
+------------------------------------------------------------------------
+
+-- $list
+-- Specifications for matching list literals built with 'listSpec.
+
+-- | Primitive specification for matching a list of values each satisfying a
+-- given element specification.
+listSpec ::
+  ValueSpec a {- ^ element specification -} ->
+  ValueSpec [a]
+listSpec = primValueSpec . ListSpec
+
 -- | Matches a non-empty list.
 --
 -- @since 0.2.0.0
-nonemptySpec :: ValueSpec a -> ValueSpec (NonEmpty a)
+nonemptySpec ::
+  ValueSpec a {- ^ element specification -} ->
+  ValueSpec (NonEmpty a)
 nonemptySpec s = customSpec "nonempty" (listSpec s) check
   where
     check xs = case NonEmpty.nonEmpty xs of
@@ -341,15 +377,24 @@ nonemptySpec s = customSpec "nonempty" (listSpec s) check
 -- | Matches a single element or a non-empty list.
 --
 -- @since 0.2.0.0
-oneOrNonemptySpec :: ValueSpec a -> ValueSpec (NonEmpty a)
+oneOrNonemptySpec ::
+  ValueSpec a {- ^ element specification -} ->
+  ValueSpec (NonEmpty a)
 oneOrNonemptySpec s = pure <$> s <!> nonemptySpec s
 
+-- | Specification that matches either a single element or multiple
+-- elements in a list. This can be convenient for allowing the user
+-- to avoid having to specify singleton lists in the configuration file.
+oneOrList ::
+  ValueSpec a {- ^ element specification -} ->
+  ValueSpec [a]
+oneOrList s = pure <$> s <!> listSpec s
 
 ------------------------------------------------------------------------
 -- 'SectionsSpec' builders
 ------------------------------------------------------------------------
 
--- $sections
+-- $sectionsspec
 -- Sections specifications allow you to define an unordered collection
 -- of required and optional sections using a convenient 'Applicative'
 -- do-notation syntax.
