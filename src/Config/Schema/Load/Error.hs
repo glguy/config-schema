@@ -48,6 +48,7 @@ import           Text.PrettyPrint
                      punctuate, comma, int, colon, hcat)
 
 import           Config
+import           Config.Macro (FilePosition(..))
 import           Config.Schema.Types
 
 #if !MIN_VERSION_base(4,11,0)
@@ -235,6 +236,9 @@ class (Typeable a, Show a) => ErrorAnnotation a where
 -- @since 1.2.0.0
 instance ErrorAnnotation Position where
   displayAnnotation pos = hcat [int (posLine pos), colon, int (posColumn pos), colon]
+
+instance ErrorAnnotation FilePosition where
+  displayAnnotation (FilePosition path pos) = hcat [text path, colon, int (posLine pos), colon, int (posColumn pos), colon]
 
 -- | Renders as an empty document
 --
