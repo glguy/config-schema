@@ -1,13 +1,10 @@
 # Revision history for config-schema
 
-## 1.2.2.0
-
-* Added `instance ErrorAnnotation FilePosition`
-
 ## 1.2.1.0
 
 * Expose `Config.Schema.Load.Error.simplifyValueSpecMismatch`
   for providing more focused error feedback.
+* Added `instance ErrorAnnotation FilePosition`
 
 ## 1.2.0.0
 
