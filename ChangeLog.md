@@ -1,5 +1,9 @@
 # Revision history for config-schema
 
+## 1.2.2.0
+
+* Re-export `Alt` from `Config.Schema.Spec`
+
 ## 1.2.1.0
 
 * Expose `Config.Schema.Load.Error.simplifyValueSpecMismatch`

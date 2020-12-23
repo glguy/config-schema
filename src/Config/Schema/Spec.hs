@@ -70,6 +70,9 @@ module Config.Schema.Spec
   , reqSection'
   , optSection'
 
+  -- * Re-exports
+  , Alt(..)
+
   ) where
 
 import           Data.Bits                        (FiniteBits, isSigned, toIntegralSized, finiteBitSize)
