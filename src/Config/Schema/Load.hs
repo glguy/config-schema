@@ -97,6 +97,9 @@ getValue1 v prim = withExcept (pure . PrimMismatch (describeSpec prim))
 -- | Match a primitive value specification against a single value.
 getValue2 :: Value p -> PrimValueSpec a -> Except (Problem p) a
 getValue2 (Text _ t)       TextSpec           = pure t
+getValue2 (Text _ a)       (SpecificTextSpec b)
+  | a == b = pure ()
+  | otherwise = throwE WrongText
 getValue2 (Number _ n)     NumberSpec         = pure n
 getValue2 (List _ xs)      (ListSpec w)       = getList w xs
 getValue2 (Atom _ b)       AnyAtomSpec        = pure (atomName b)

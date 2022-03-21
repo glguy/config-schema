@@ -45,6 +45,7 @@ module Config.Schema.Spec
   -- ** Text specifications
   -- $text
   , textSpec
+  , textSpec'
   , stringSpec
 
   -- ** Atom specifications
@@ -348,6 +349,10 @@ trueOrFalseSpec = True <$ atomSpec "true" <!> False <$ atomSpec "false"
 -- @since 1.2.0.0
 textSpec :: ValueSpec Text
 textSpec = primValueSpec TextSpec
+
+-- | Specification for matching a specific text literal
+textSpec' :: Text -> ValueSpec ()
+textSpec' = primValueSpec . SpecificTextSpec
 
 -- | Specification for matching any text as a 'String'
 stringSpec :: ValueSpec String

@@ -59,6 +59,8 @@ data PrimValueSpec :: * -> * where
   -- | Matches any string literal
   TextSpec :: PrimValueSpec Text
 
+  SpecificTextSpec :: Text -> PrimValueSpec ()
+
   -- | Matches numbers
   NumberSpec :: PrimValueSpec Number
 
@@ -80,7 +82,7 @@ data PrimValueSpec :: * -> * where
 
   -- | Documentation text and underlying specification. This specification
   -- will match values where the underlying specification returns a
-  -- 'Right' value. Otherwise a 'Left' should contain a short failure 
+  -- 'Right' value. Otherwise a 'Left' should contain a short failure
   -- explanation.
   CustomSpec :: Text -> ValueSpec (Either Text a) -> PrimValueSpec a
 

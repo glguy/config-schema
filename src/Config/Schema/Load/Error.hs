@@ -86,6 +86,7 @@ data Problem p
   | TypeMismatch                                 -- ^ value and spec type mismatch
   | CustomProblem Text                           -- ^ custom spec error message
   | WrongAtom                                    -- ^ atoms didn't match
+  | WrongText                                    -- ^ specific text didn't match
   deriving Show
 
 -- | Describe outermost shape of a 'PrimValueSpec'
@@ -93,6 +94,7 @@ data Problem p
 -- @since 1.2.0.0
 describeSpec :: PrimValueSpec a -> Text
 describeSpec TextSpec                   = "text"
+describeSpec (SpecificTextSpec a)       = "text \"" <> a <> "\""
 describeSpec NumberSpec                 = "number"
 describeSpec AnyAtomSpec                = "atom"
 describeSpec (AtomSpec a)               = "atom `" <> a <> "`"
@@ -138,6 +140,7 @@ isTypeMismatch :: PrimMismatch p -> Bool
 isTypeMismatch (PrimMismatch _ prob) =
   case prob of
     WrongAtom                                -> True
+    WrongText                                -> True
     TypeMismatch                             -> True
     NestedProblem (ValueSpecMismatch _ _ xs) -> all isTypeMismatch xs
     _                                        -> False
@@ -201,6 +204,9 @@ prettyProblem p =
   case p of
     TypeMismatch ->
       ( text "- type mismatch"
+      , empty)
+    WrongText ->
+      ( text "- wrong text"
       , empty)
     WrongAtom ->
       ( text "- wrong atom"

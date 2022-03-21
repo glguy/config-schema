@@ -128,15 +128,16 @@ disjunction False xs =         hsep (intersperse "or" xs)
 valueDoc :: PrimValueSpec a -> DocBuilder Doc
 valueDoc w =
   case w of
-    TextSpec         -> pure "text"
-    NumberSpec       -> pure "number"
-    AtomSpec a       -> pure ("`" <> txt a <> "`")
-    AnyAtomSpec      -> pure "atom"
-    SectionsSpec l s -> sectionsDoc l s
-    NamedSpec    l s -> emitDoc l (valuesDoc False s)
-    CustomSpec l w'  -> (txt l                 <+>) <$> valuesDoc True w'
-    ListSpec ws      -> ("list of"             <+>) <$> valuesDoc True ws
-    AssocSpec ws     -> ("association list of" <+>) <$> valuesDoc True ws
+    TextSpec           -> pure "text"
+    SpecificTextSpec a -> pure ("\"" <> txt a <> "\"")
+    NumberSpec         -> pure "number"
+    AtomSpec a         -> pure ("`" <> txt a <> "`")
+    AnyAtomSpec        -> pure "atom"
+    SectionsSpec l s   -> sectionsDoc l s
+    NamedSpec    l s   -> emitDoc l (valuesDoc False s)
+    CustomSpec l w'    -> (txt l                 <+>) <$> valuesDoc True w'
+    ListSpec ws        -> ("list of"             <+>) <$> valuesDoc True ws
+    AssocSpec ws       -> ("association list of" <+>) <$> valuesDoc True ws
 
 
 -- | A writer-like type. A mapping of section names and documentation

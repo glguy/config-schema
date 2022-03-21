@@ -65,6 +65,9 @@ main = sequenceA_
   , test (atomSpec "testing-1-2-3") ()
     [["testing-1-2-3"]]
 
+  , test (textSpec' "specific-text") ()
+    [["\"specific-text\""]]
+
   , test (listSpec anySpec) ([]::[Integer])
     [["[]"]
     ,["[ ]"]]
