@@ -26,6 +26,7 @@ module Config.Schema.Spec
     ValueSpec
   , customSpec
   , namedSpec
+  , exactSpec
   , HasSpec(..)
 
   -- ** Key-value mapping specifications
@@ -87,6 +88,7 @@ import           Data.Ratio
 import           GHC.Natural                      (Natural)
 
 import           Config.Schema.Types
+import           Config (Value(..), Atom(..))
 import           Config.Number (Number, numberToInteger, numberToRational)
 
 ------------------------------------------------------------------------
@@ -226,6 +228,11 @@ namedSpec n s = primValueSpec (NamedSpec n s)
 customSpec :: Text -> ValueSpec a -> (a -> Either Text b) -> ValueSpec b
 customSpec lbl w f = primValueSpec (CustomSpec lbl (f <$> w))
 
+-- | Match an exact value. This can be used to match a specific text
+-- literal number literal, atom, list of exact things, etc.
+exactSpec :: Value () -> ValueSpec ()
+exactSpec = primValueSpec . ExactSpec
+
 ------------------------------------------------------------------------
 
 -- $sections
@@ -320,11 +327,11 @@ rationalSpec = numberToRational <$> numberSpec
 atomSpec ::
   Text {- ^ atom -} ->
   ValueSpec ()
-atomSpec = primValueSpec . AtomSpec
+atomSpec t = () <$ primValueSpec (ExactSpec (Atom () (MkAtom t)))
 
 -- | Primitive specification for matching any atom. Matched atom is returned.
 anyAtomSpec :: ValueSpec Text
-anyAtomSpec = primValueSpec AnyAtomSpec
+anyAtomSpec = primValueSpec AtomSpec
 
 -- | Specification for using atoms @yes@ and @no@ to represent booleans 'True'
 -- and 'False' respectively

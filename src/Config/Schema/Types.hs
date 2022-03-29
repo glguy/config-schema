@@ -36,6 +36,7 @@ module Config.Schema.Types
 
   ) where
 
+import           Config                   (Value)
 import           Config.Number            (Number)
 import           Control.Applicative      (Const(..))
 import           Control.Applicative.Free (Ap, liftAp, runAp, runAp_)
@@ -63,10 +64,7 @@ data PrimValueSpec :: * -> * where
   NumberSpec :: PrimValueSpec Number
 
   -- | Matches any atom
-  AnyAtomSpec :: PrimValueSpec Text
-
-  -- | Specific atom to be matched
-  AtomSpec :: Text -> PrimValueSpec ()
+  AtomSpec :: PrimValueSpec Text
 
   -- | Matches a list of the underlying specification
   ListSpec :: ValueSpec a -> PrimValueSpec [a]
@@ -86,6 +84,9 @@ data PrimValueSpec :: * -> * where
 
   -- | Label used to hide complex specifications in documentation.
   NamedSpec :: Text -> ValueSpec a -> PrimValueSpec a
+
+  -- | Specific value to be matched
+  ExactSpec :: Value () -> PrimValueSpec ()
 
 -- | Non-empty disjunction of value specifications. This type is the primary
 -- way to specify expected values.

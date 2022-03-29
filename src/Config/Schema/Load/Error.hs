@@ -85,7 +85,7 @@ data Problem p
   | NestedProblem          (ValueSpecMismatch p) -- ^ generic nested error
   | TypeMismatch                                 -- ^ value and spec type mismatch
   | CustomProblem Text                           -- ^ custom spec error message
-  | WrongAtom                                    -- ^ atoms didn't match
+  | WrongExact                                   -- ^ values didn't match
   deriving Show
 
 -- | Describe outermost shape of a 'PrimValueSpec'
@@ -94,13 +94,14 @@ data Problem p
 describeSpec :: PrimValueSpec a -> Text
 describeSpec TextSpec                   = "text"
 describeSpec NumberSpec                 = "number"
-describeSpec AnyAtomSpec                = "atom"
-describeSpec (AtomSpec a)               = "atom `" <> a <> "`"
+describeSpec AtomSpec                   = "atom"
 describeSpec (ListSpec _)               = "list"
 describeSpec (SectionsSpec name _)      = name
 describeSpec (AssocSpec _)              = "sections"
 describeSpec (CustomSpec name _)        = name
 describeSpec (NamedSpec name _)         = name
+describeSpec (ExactSpec (Atom _ a))     = "atom `" <> atomName a <> "`"
+describeSpec (ExactSpec v)              = Text.pack (show (pretty v))
 
 -- | Describe outermost shape of a 'Value'
 describeValue :: Value p -> Text
@@ -137,7 +138,7 @@ removeTypeMismatch1 v = v
 isTypeMismatch :: PrimMismatch p -> Bool
 isTypeMismatch (PrimMismatch _ prob) =
   case prob of
-    WrongAtom                                -> True
+    WrongExact                               -> True
     TypeMismatch                             -> True
     NestedProblem (ValueSpecMismatch _ _ xs) -> all isTypeMismatch xs
     _                                        -> False
@@ -202,8 +203,8 @@ prettyProblem p =
     TypeMismatch ->
       ( text "- type mismatch"
       , empty)
-    WrongAtom ->
-      ( text "- wrong atom"
+    WrongExact ->
+      ( text "- wrong value"
       , empty)
     MissingSection name ->
       ( text "- missing section:" <+> text (Text.unpack name)

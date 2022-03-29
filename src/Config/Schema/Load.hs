@@ -99,10 +99,10 @@ getValue2 :: Value p -> PrimValueSpec a -> Except (Problem p) a
 getValue2 (Text _ t)       TextSpec           = pure t
 getValue2 (Number _ n)     NumberSpec         = pure n
 getValue2 (List _ xs)      (ListSpec w)       = getList w xs
-getValue2 (Atom _ b)       AnyAtomSpec        = pure (atomName b)
-getValue2 (Atom _ b)       (AtomSpec a)
-  | a == atomName b = pure ()
-  | otherwise       = throwE WrongAtom
+getValue2 (Atom _ b)       AtomSpec           = pure (atomName b)
+getValue2 v                (ExactSpec w)
+  | (() <$ v) == w = pure ()
+  | otherwise      = throwE WrongExact
 getValue2 (Sections _ s)   (SectionsSpec _ w) = getSections w s
 getValue2 (Sections _ s)   (AssocSpec w)      = getAssoc w s
 getValue2 v                (NamedSpec _ w)    = getValue' NestedProblem w v
