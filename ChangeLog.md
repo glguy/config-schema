@@ -1,6 +1,6 @@
 # Revision history for config-schema
 
-## 1.3
+## 1.3.0.0
 
 * Generalize atomSpec to suport arbitrary exactSpec matches
 

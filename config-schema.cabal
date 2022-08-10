@@ -1,6 +1,6 @@
 cabal-version:       2.2
 name:                config-schema
-version:             1.3
+version:             1.3.0.0
 synopsis:            Schema definitions for the config-value package
 license:             ISC
 license-file:        LICENSE
