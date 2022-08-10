@@ -137,8 +137,7 @@ valueDoc w =
     CustomSpec l w'  -> (txt l                 <+>) <$> valuesDoc True w'
     ListSpec ws      -> ("list of"             <+>) <$> valuesDoc True ws
     AssocSpec ws     -> ("association list of" <+>) <$> valuesDoc True ws
-    ExactSpec (Atom _ a) -> pure ("`" <> txt (atomName a) <> "`")
-    ExactSpec v      -> pure (pretty v)
+    ExactSpec v      -> pure ("`" <> prettyInline v <> "`")
 
 -- | A writer-like type. A mapping of section names and documentation
 -- lines is accumulated.

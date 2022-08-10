@@ -100,8 +100,7 @@ describeSpec (SectionsSpec name _)      = name
 describeSpec (AssocSpec _)              = "sections"
 describeSpec (CustomSpec name _)        = name
 describeSpec (NamedSpec name _)         = name
-describeSpec (ExactSpec (Atom _ a))     = "atom `" <> atomName a <> "`"
-describeSpec (ExactSpec v)              = Text.pack (show (pretty v))
+describeSpec (ExactSpec v)              = describeValue v
 
 -- | Describe outermost shape of a 'Value'
 describeValue :: Value p -> Text

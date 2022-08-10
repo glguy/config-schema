@@ -1,5 +1,9 @@
 # Revision history for config-schema
 
+## 1.3
+
+* Generalize atomSpec to suport arbitrary exactSpec matches
+
 ## 1.2.2.0
 
 * Re-export `Alt` from `Config.Schema.Spec`
