@@ -131,7 +131,7 @@ valueDoc w =
   case w of
     TextSpec         -> pure "text"
     NumberSpec       -> pure "number"
-    AtomSpec      -> pure "atom"
+    AtomSpec         -> pure "atom"
     SectionsSpec l s -> sectionsDoc l s
     NamedSpec    l s -> emitDoc l (valuesDoc False s)
     CustomSpec l w'  -> (txt l                 <+>) <$> valuesDoc True w'
