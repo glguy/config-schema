@@ -1,7 +1,7 @@
 config-schema
 =============
 
-[![Hackage](https://img.shields.io/hackage/v/config-schema.svg)](https://hackage.haskell.org/package/config-schema) [![Build Status](https://secure.travis-ci.org/glguy/config-schema.png?branch=master)](http://travis-ci.org/glguy/config-schema)
+[![Hackage](https://img.shields.io/hackage/v/config-schema.svg)](https://hackage.haskell.org/package/config-schema)
 
 Live Demo
 --------
