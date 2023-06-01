@@ -429,14 +429,14 @@ oneOrList s = pure <$> s <!> listSpec s
 --
 -- Example configuration components and their extracted values.
 --
--- > base:     "VAR"
--- > optional: "1"
+-- > base:   "VAR"
+-- > suffix: "1"
 -- > -- Generates: VAR1
 --
 -- Order doesn't matter
 --
--- > optional: "1"
--- > base:     "VAR"
+-- > suffix: "1"
+-- > base:   "VAR"
 -- > -- Generates: VAR1
 --
 -- Optional fields can be omitted
@@ -452,7 +452,7 @@ oneOrList s = pure <$> s <!> listSpec s
 --
 -- All required sections must appear for successful match
 --
--- > optional: "1"
+-- > suffix: "1"
 -- > -- Failure due to missing required section
 
 -- | Specification for a required section with an implicit value specification.
