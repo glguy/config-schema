@@ -35,7 +35,7 @@ library
     Config.Schema.Types
 
   build-depends:
-    base           >=4.9   && <4.20,
+    base           >=4.9   && <4.21,
     config-value   ^>=0.8.3,
     containers     >=0.5   && <0.8,
     free           >=4.12  && <5.3,
