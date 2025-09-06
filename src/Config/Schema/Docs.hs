@@ -58,12 +58,21 @@ import           Config
 import           Config.Schema.Spec
 import           Config.Schema.Types
 
+
+data DocBodyKind = ShortBody | LongBody
+type DocBody     = (DocBodyKind, Doc)
+
+
 -- | Default documentation generator.
 generateDocs :: ValueSpec a -> Doc
 generateDocs spec = vcat' docLines
   where
-    sectionLines :: (Text, Doc) -> [Doc]
-    sectionLines (name, fields) = [text "", txt name, nest 4 fields]
+    sectionLines :: (Text, DocBody) -> [Doc]
+    sectionLines (name, (docKind, doc)) = [text "", txt name <> docHead] ++ docLines
+        where
+            (docHead, docLines) = case docKind of
+                ShortBody -> (txt ": " <> doc, [])
+                LongBody  -> (txt " fields: ", [nest 4 doc])
 
     (topDoc, topMap) = runDocBuilder (valuesDoc False spec)
 
@@ -73,7 +82,7 @@ generateDocs spec = vcat' docLines
         SomeSpec (SectionsSpec name _) :| []
           | Just top <- Map.lookup name topMap ->
               txt "Top-level configuration file fields:" :
-              nest 4 top :
+              nest 4 (snd top) :
               concatMap sectionLines (Map.toList (Map.delete name topMap))
 
         -- otherwise
@@ -89,7 +98,7 @@ data SomeSpec where SomeSpec :: PrimValueSpec a -> SomeSpec
 -- | Compute the documentation for a list of sections, store the
 -- documentation in the sections map and return the name of the section.
 sectionsDoc :: Text -> SectionsSpec a -> DocBuilder Doc
-sectionsDoc l spec = emitDoc l (vcat' <$> runSections_ (fmap pure . sectionDoc) spec)
+sectionsDoc l spec = emitDoc l LongBody (vcat' <$> runSections_ (fmap pure . sectionDoc) spec)
 
 
 -- | Compute the documentation lines for a single key-value pair.
@@ -120,9 +129,8 @@ valuesDoc nested =
 -- | Combine a list of text with the word @or@.
 disjunction :: Bool {- ^ nested -} -> [Doc] -> Doc
 disjunction _ [x]    = x
-disjunction True  xs = parens (hsep (intersperse "or" xs))
-disjunction False xs =         hsep (intersperse "or" xs)
-
+disjunction True  xs = parens (hsep (intersperse "OR" xs))
+disjunction False xs =         hsep (intersperse "OR" xs)
 
 
 -- | Compute the documentation fragment for an individual value specification.
@@ -133,7 +141,7 @@ valueDoc w =
     NumberSpec       -> pure "number"
     AtomSpec         -> pure "atom"
     SectionsSpec l s -> sectionsDoc l s
-    NamedSpec    l s -> emitDoc l (valuesDoc False s)
+    NamedSpec    l s -> emitDoc l ShortBody (valuesDoc False s)
     CustomSpec l w'  -> (txt l                 <+>) <$> valuesDoc True w'
     ListSpec ws      -> ("list of"             <+>) <$> valuesDoc True ws
     AssocSpec ws     -> ("association list of" <+>) <$> valuesDoc True ws
@@ -141,10 +149,10 @@ valueDoc w =
 
 -- | A writer-like type. A mapping of section names and documentation
 -- lines is accumulated.
-newtype DocBuilder a = DocBuilder (State (Map Text Doc) a)
+newtype DocBuilder a = DocBuilder (State (Map Text DocBody) a)
   deriving (Functor, Applicative, Monad)
 
-runDocBuilder :: DocBuilder a -> (a, Map Text Doc)
+runDocBuilder :: DocBuilder a -> (a, Map Text DocBody)
 runDocBuilder (DocBuilder b) = runState b mempty
 
 -- | lifts underlying 'S.Semigroup' instance
@@ -160,14 +168,15 @@ instance (S.Semigroup a, Monoid a) => Monoid (DocBuilder a) where
 -- | Given a section name and section body, store the body
 -- in the map of sections and return the section name.
 emitDoc ::
-  Text           {- ^ section name     -} ->
-  DocBuilder Doc {- ^ section body     -} ->
-  DocBuilder Doc {- ^ section name doc -}
-emitDoc l (DocBuilder sub) = DocBuilder $
+  Text           {- ^ section name      -} ->
+  DocBodyKind    {- ^ section body kind -} ->
+  DocBuilder Doc {- ^ section body      -} ->
+  DocBuilder Doc {- ^ section name doc  -}
+emitDoc l kind (DocBuilder body) = DocBuilder $
   do m <- get
      unless (Map.member l m) $
-       do rec put $! Map.insert l val m
-              val <- sub
+       do rec put $! Map.insert l (kind, body') m
+              body' <- body
           return ()
      return (txt l)
   -- by using a recursively defined do block and
