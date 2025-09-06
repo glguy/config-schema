@@ -68,9 +68,9 @@ generateDocs :: ValueSpec a -> Doc
 generateDocs spec = vcat' docLines
   where
     sectionLines :: (Text, DocBody) -> [Doc]
-    sectionLines (name, (docKind, doc)) = [text "", txt name <> docHead] ++ docLines
+    sectionLines (name, (docKind, doc)) = [text "", txt name <> secHead] ++ secLines
         where
-            (docHead, docLines) = case docKind of
+            (secHead, secLines) = case docKind of
                 ShortBody -> (txt ": " <> doc, [])
                 LongBody  -> (txt " fields: ", [nest 4 doc])
 
